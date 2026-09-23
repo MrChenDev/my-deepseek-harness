@@ -10,7 +10,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import ApprovalService, { type ApprovalOutcome, type ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
 import ToolRuntime, {
   defineContentToolFixture, defineTool, JsonSchemaError, parameterSchemaSpecToJsonSchema, validateArgs, ToolArgsError, ToolNotFoundError,
-  TOOL_ABORTED, TOOL_ABORTED_BEFORE_DISPATCH,
+  TOOL_ABORTED, TOOL_ABORTED_BEFORE_DISPATCH, TOOL_RUNTIME_SCHEDULER,
   type InferArgs, type ParameterSchemaSpec, type PreToolDecision, type PostToolDecision,
   type JsonSchemaNode, type ToolDefinition, type ToolDispatchExecution, type ToolExecutionResult, type ToolExecutionToken,
 } from '@deepseek-ai/dsh-tools'
@@ -2148,6 +2148,17 @@ describe('ToolRuntime', () => {
     await fiber.dispose()
     expect(order).toEqual(['registered', 'first: still registered', 'disposed-last'])
     expect(ctx.tools.get('nested')).toBeUndefined()
+  })
+})
+
+describe('TOOL_RUNTIME_SCHEDULER', () => {
+  it('registers the key globally, so a separately loaded copy of this package reaches the scheduler', async () => {
+    const ctx = await setup()
+    const scheduler = ctx.tools[TOOL_RUNTIME_SCHEDULER]
+    expect(scheduler).toBeDefined()
+    // A second loaded copy derives the key from the same registered name; a
+    // module-local Symbol would leave `ctx.tools` without that key.
+    expect(Reflect.get(ctx.tools, Symbol.for('@deepseek-ai/dsh-tools.scheduler'))).toBe(scheduler)
   })
 })
 
