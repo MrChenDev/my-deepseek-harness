@@ -46,3 +46,6 @@ worktrees/
 .agents/worktrees/
 .typert-*/
 native/system/test/bin/
+
+# Local helper scripts under myStudy/run (double-click launchers); kept out of the repository.
+myStudy/run/
