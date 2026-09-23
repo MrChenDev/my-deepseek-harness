@@ -88,8 +88,12 @@ class Relationships {
     }
   }
 
-  closeTools(type: string): void {
-    if (this.tools.size !== 0) throw new SessionFormatError(`${type} leaves unresolved tool call ${String(this.tools.keys().next().value)}`)
+  /**
+   * Release the closing step's unsettled calls. A terminal tool-scheduler
+   * failure ends its turn with recorded `tool/call` events and no results, so
+   * the boundary drops them instead of requiring settlement.
+   */
+  closeTools(): void {
     this.tools.clear()
   }
 
@@ -280,7 +284,7 @@ class Relationships {
         break
       case 'turn/end':
         if (this.turn === null || data['turn'] !== this.turn || this.step !== null) throw new SessionFormatError('turn/end does not match the open turn with no open step')
-        this.closeTools(event.type)
+        this.closeTools()
         this.turn = null
         this.nextTurn += 1
         break
@@ -290,7 +294,7 @@ class Relationships {
         break
       case 'step/end':
         this.requireStep(event, data)
-        this.closeTools(event.type)
+        this.closeTools()
         this.step = null
         this.nextStep += 1
         break

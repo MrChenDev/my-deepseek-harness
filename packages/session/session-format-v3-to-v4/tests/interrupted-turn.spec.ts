@@ -127,7 +127,7 @@ describe('V3 interrupted-turn migration', () => {
     expect(output.values).toEqual(restore(source, seeded).events)
   })
 
-  it('refuses unresolved tool advertisements even when a restart has the expected splice', () => {
+  it('releases an unresolved tool advertisement at the closing step of a restart', () => {
     const source = events([
       ...prefix().slice(0, 2),
       { ...row('assistant/message', { turn: 1, step: 1, stream: [], message: {
@@ -136,7 +136,11 @@ describe('V3 interrupted-turn migration', () => {
       } }), surfaceOp: 'append' },
       ...prefix().slice(2), start(2),
     ])
-    expect(() => restore(source)).toThrow('unresolved')
+    const artifact = restore(source)
+    expect(artifact.events.map(event => event.type)).toEqual([
+      'turn/start', 'step/start', 'assistant/message', 'step/end', 'agent/inbox/spliced', 'turn/end', 'turn/start',
+    ])
+    expect(artifact.events[5]).toMatchObject({ data: { turn: 1, reason: { kind: 'interrupted' } } })
   })
 
   it('remaps prune ranges and optional command references without interpreting unrelated data', () => {

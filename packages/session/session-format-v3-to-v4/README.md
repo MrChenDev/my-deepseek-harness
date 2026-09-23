@@ -159,7 +159,7 @@ Storage supplies recognizable direct-child evidence and rechecks membership and 
 <a id="sequence-references"></a>
 ### Sequence references and inheritance
 
-An open turn with no open step can be closed when the next numbered `turn/start` immediately follows a nonempty `agent/inbox/spliced` for `next-turn`. The stage inserts `turn/end` with reason `interrupted` immediately before that start, using its timestamp. Open tails remain open. Other turn-order violations, unresolved tools, and active compactions still fail target validation. Native V4 never applies this repair.
+An open turn with no open step can be closed when the next numbered `turn/start` immediately follows a nonempty `agent/inbox/spliced` for `next-turn`. The stage inserts `turn/end` with reason `interrupted` immediately before that start, using its timestamp. Open tails remain open. Other turn-order violations and active compactions still fail target validation. Native V4 never applies this repair.
 
 Insertion renumbers subsequent envelopes densely and remaps audited same-artifact references: `sourceEventSeqs`, replacement `startSeq/endSeq`, command completion `sourceEventSeq`, title `messageSeqs`, compaction `shadowedRange` and `shadowedSeqs`, and image-offload target `seq`. Captured Session references, generation-qualified delivery coordinates, turn/step numbers, stream and image indexes, ids, and arbitrary JSON retain their values. Unknown ignorable events retain opaque payload and surface metadata; only their envelope sequence is renumbered. Without insertion, source event coordinates remain unchanged; appended catalog records only extend the suffix.
 
@@ -235,7 +235,7 @@ Current common admission does not validate each user/tool/developer content bloc
 
 | Owner | Required relationship |
 |---|---|
-| `turn/start`, `turn/end`, `step/start`, `step/end` | Ordered turn/step numbers, matching open owners, no overlapping turn/step, and no unresolved advertised or started tool call at a closing boundary. Unfinished tails remain open. |
+| `turn/start`, `turn/end`, `step/start`, `step/end` | Ordered turn/step numbers, matching open owners, and no overlapping turn/step. A closing boundary releases that step's unsettled calls: a terminal tool-scheduler failure ends its turn with recorded `tool/call` events and no results, and a later result cannot pair with the released id. Unfinished tails remain open. |
 | `assistant/message`, `tool/call`, appended `tool/result` | Match an open step; advertised call ids are unique, starts retain name/arguments, and results settle one advertised call. A result before its start requires the exact admitted `TOOL_NOT_STARTED` repair. Tool-result surface replacements require an open turn instead of replaying the original call lifecycle. |
 | `system/message`, `developer/message`, `assistant/attempt` | Match an open turn and step. Request headers and contexts require an open turn. |
 | `tool/ptc-dispatch-start`, `tool/ptc-dispatch` | Require an open turn, unique sub-call start and settlement, stable root/parent/name/arguments, and a nested parent belonging to the same root. |

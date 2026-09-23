@@ -159,7 +159,7 @@ Stage 只把最终继承截点之后的父目录记录作为候选。每个 inhe
 <a id="sequence-references"></a>
 ### 序号引用与继承
 
-当回合仍打开但没有打开的 step，且下一个连续编号的 `turn/start` 紧跟非空的 `next-turn` 类型 `agent/inbox/spliced` 时，Stage 可补齐该回合。它紧挨新 start 之前插入原因是 `interrupted` 的 `turn/end`，时间戳取该 start。开放尾部仍保持开放。其他回合顺序错误、未结算工具和进行中的 compaction 仍被目标校验拒绝。原生 V4 不执行此修复。
+当回合仍打开但没有打开的 step，且下一个连续编号的 `turn/start` 紧跟非空的 `next-turn` 类型 `agent/inbox/spliced` 时，Stage 可补齐该回合。它紧挨新 start 之前插入原因是 `interrupted` 的 `turn/end`，时间戳取该 start。开放尾部仍保持开放。其他回合顺序错误和进行中的 compaction 仍被目标校验拒绝。原生 V4 不执行此修复。
 
 插入后，后续信封重新连续编号，并重映射已审计的同日志引用：`sourceEventSeqs`、替换端点 `startSeq/endSeq`、命令完成的 `sourceEventSeq`、标题的 `messageSeqs`、compaction 的 `shadowedRange` 与 `shadowedSeqs`，以及图片 offload 目标的 `seq`。捕获的 Session 引用、带代际的 delivery 坐标、turn／step 编号、stream 与图片索引、id 和任意 JSON 保持原值。未知可忽略事件的载荷和表面元数据保持不透明，只重排其信封序号。没有插入时，源事件坐标不变；追加的目录记录只扩展后缀。
 
@@ -235,7 +235,7 @@ System image 接纳要求非空 attachment id、PNG／JPEG／WebP／GIF MIME 类
 
 | 所有者 | 必需关系 |
 |---|---|
-| `turn/start`、`turn/end`、`step/start`、`step/end` | Turn／step 编号有序，开放所有者匹配，turn／step 不重叠，结束边界不遗留已声明或已开始但未解决的工具调用。未完成尾部保持开放。 |
+| `turn/start`、`turn/end`、`step/start`、`step/end` | Turn／step 编号有序，开放所有者匹配，turn／step 不重叠。关闭边界释放该 step 未结算的调用：终止性工具调度失败会让回合以已记录 `tool/call`、没有结果的形态结束，之后的结果无法再与该 id 配对。未完成尾部保持开放。 |
 | `assistant/message`、`tool/call`、追加的 `tool/result` | 匹配开放 step；声明的调用 id 唯一，开始保留 name／arguments，结果结算一个已声明调用。开始之前的结果必须是精确获准的 `TOOL_NOT_STARTED` 修复。工具结果的表面替换要求开放 turn，不重放原始调用生命周期。 |
 | `system/message`、`developer/message`、`assistant/attempt` | 匹配开放 turn 与 step。Request header 和 context 要求开放 turn。 |
 | `tool/ptc-dispatch-start`、`tool/ptc-dispatch` | 要求开放 turn、唯一 sub-call 开始与结算、稳定的 root／parent／name／arguments，以及属于同一 root 的嵌套 parent。 |

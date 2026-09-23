@@ -76,12 +76,18 @@ describe('mandatory V4 lifecycle restoration', () => {
     ['repeated start', [...begin(), assistant(), toolCall(), toolCall()]],
     ['unstarted success', [...begin(), assistant(), result()]],
     ['repeated result', [...begin(), assistant(), toolCall(), result(), result()]],
-    ['unresolved advertised call', [...begin(), assistant(), ...end()]],
-    ['unresolved started call', [...begin(), assistant(), toolCall(), ...end()]],
     ['header outside turn', [request()]],
     ['context outside turn', [row('request/context', { provider: 'mock', model: 'mock' })]],
   ] satisfies Array<[string, Row[]]>)('rejects %s', (_name, rows) => {
     expect(() => reopen(rows)).toThrow()
+  })
+
+  it('releases unsettled calls at a closing boundary and refuses their later results', () => {
+    expect(reopen([...begin(), assistant(), toolCall(), ...end()]).messages.map(message => message.role)).toEqual(['assistant'])
+    expect(reopen([...begin(), assistant(), ...end()]).messages.map(message => message.role)).toEqual(['assistant'])
+    const nextStep = [row('turn/start', { turn: 2 }), row('step/start', { turn: 2, step: 1 })]
+    const reopened = [...begin(), assistant(), toolCall(), ...end(), ...nextStep]
+    expect(() => reopen([...reopened, { ...result(), data: { ...result().data, turn: 2, step: 1 } }])).toThrow()
   })
 
   it('accepts exact not-started repairs with preserved historical identity suffixes', () => {
