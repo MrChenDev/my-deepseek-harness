@@ -5,7 +5,7 @@
   依赖清单有变化时自动跑 pnpm install。由同目录的 pull-latest.cmd 双击调用。
 #>
 param(
-  # 跳过合并完成后的自动 push。
+  # 跳过全部自动 push（dev 与 master 镜像）。
   [switch]$NoPush
 )
 
@@ -43,18 +43,18 @@ if ($untracked.Count -gt 0) {
 $before = (& git rev-parse HEAD).Trim()
 $lockBefore = if (Test-Path 'pnpm-lock.yaml') { (Get-FileHash 'pnpm-lock.yaml').Hash } else { '' }
 
-Write-Host '[1/4] 拉取 origin…' -ForegroundColor Cyan
+Write-Host '[1/5] 拉取 origin…' -ForegroundColor Cyan
 Invoke-Git @('fetch', 'origin', '--prune')
 
-Write-Host '[2/4] 更新本地 master 指针（不切分支）…' -ForegroundColor Cyan
+Write-Host '[2/5] 更新本地 master 指针（不切分支）…' -ForegroundColor Cyan
 & git fetch origin master:master
 if ($LASTEXITCODE -ne 0) { Write-Host '  master 不是快进更新，已跳过；需要时手动处理。' -ForegroundColor Yellow }
 
-Write-Host '[3/4] 把 dev 快进到 origin/dev…' -ForegroundColor Cyan
+Write-Host '[3/5] 把 dev 快进到 origin/dev…' -ForegroundColor Cyan
 & git merge --ff-only origin/dev
 if ($LASTEXITCODE -ne 0) { Write-Host '  本地 dev 与 origin/dev 已分叉（通常是本机有未推送提交），跳过。' -ForegroundColor Yellow }
 
-Write-Host '[4/4] 合并上游 upstream/master…' -ForegroundColor Cyan
+Write-Host '[4/5] 拉取上游并合并进 dev…' -ForegroundColor Cyan
 $upstreamUrl = 'https://github.com/deepseek-ai/deepseek-harness.git'
 $existingUpstream = (& git remote get-url upstream 2>$null)
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($existingUpstream)) {
@@ -71,6 +71,14 @@ if ($LASTEXITCODE -ne 0) {
   exit 1
 }
 
+Write-Host '[5/5] 检查 fork 的 master 镜像…' -ForegroundColor Cyan
+$mirrorBehind = [int]((& git rev-list --count 'origin/master..upstream/master').Trim())
+if ($mirrorBehind -eq 0) {
+  Write-Host '  已是上游最新镜像，无需更新。' -ForegroundColor DarkGray
+} else {
+  Write-Host "  落后上游 $mirrorBehind 个提交，将随本次 push 一起快进。" -ForegroundColor Cyan
+}
+
 $after = (& git rev-parse HEAD).Trim()
 $lockAfter = if (Test-Path 'pnpm-lock.yaml') { (Get-FileHash 'pnpm-lock.yaml').Hash } else { '' }
 if ($lockAfter -ne $lockBefore) {
@@ -82,19 +90,23 @@ if ($lockAfter -ne $lockBefore) {
 }
 
 $aheadCount = [int]((& git rev-list --count 'origin/dev..HEAD').Trim())
+$pushRefspecs = @()
+if ($aheadCount -gt 0) { $pushRefspecs += 'dev' }
+if ($mirrorBehind -gt 0) { $pushRefspecs += 'upstream/master:master' }
 if ($NoPush) {
   Write-Host '已按 -NoPush 跳过 push。' -ForegroundColor DarkGray
-} elseif ($aheadCount -gt 0) {
-  Write-Host "把 dev 推送到 origin（$aheadCount 个提交）…" -ForegroundColor Cyan
-  & git push origin dev
+} elseif ($pushRefspecs.Count -eq 0) {
+  Write-Host '没有需要推送的内容。' -ForegroundColor DarkGray
+} else {
+  Write-Host "推送到 origin：$($pushRefspecs -join '、')…" -ForegroundColor Cyan
+  & git push origin @pushRefspecs
   if ($LASTEXITCODE -ne 0) {
-    Write-Host '  push 失败：本地合并已完成。' -ForegroundColor Red
+    Write-Host '  push 失败：本地合并已完成（部分引用可能已推送成功）。' -ForegroundColor Red
     Write-Host '  常见原因是 pre-push 钩子环境找不到 node/npm；可先重试 git push origin dev，' -ForegroundColor Yellow
     Write-Host '  仍失败则临时用 git push --no-verify origin dev（跳过本机 typecheck，CI 仍会跑）。' -ForegroundColor Yellow
     exit 1
   }
-} else {
-  Write-Host 'dev 没有未推送的提交，跳过 push。' -ForegroundColor DarkGray
+  if ($mirrorBehind -gt 0) { & git fetch origin master:master 2>$null | Out-Null }
 }
 
 Write-Host ''
