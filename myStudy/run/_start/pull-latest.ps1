@@ -133,4 +133,4 @@ foreach ($name in @('dev', 'master')) {
   $colour = if ($ahead -eq 0 -and $behind -eq 0) { 'Green' } else { 'Yellow' }
   Write-Host ("  {0,-7} {1}  [{2}]" -f $name, $state, $local.Substring(0, 8)) -ForegroundColor $colour
 }
-Write-Host '  说明：master 是上游镜像，第 [2/4] 步只更新它的本地指针（不切分支、不动工作区）；日常只在 dev 上工作。' -ForegroundColor DarkGray
+Write-Host '  说明：master 是上游镜像，第 [2/5] 步只更新它的本地指针，第 [5/5] 步快进镜像；日常只在 dev 上工作。' -ForegroundColor DarkGray
