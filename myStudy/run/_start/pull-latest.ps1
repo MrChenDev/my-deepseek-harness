@@ -88,7 +88,9 @@ if ($NoPush) {
   Write-Host "把 dev 推送到 origin（$aheadCount 个提交）…" -ForegroundColor Cyan
   & git push origin dev
   if ($LASTEXITCODE -ne 0) {
-    Write-Host '  push 失败：本地合并已完成，稍后可手动执行 git push origin dev。' -ForegroundColor Red
+    Write-Host '  push 失败：本地合并已完成。' -ForegroundColor Red
+    Write-Host '  常见原因是 pre-push 钩子环境找不到 node/npm；可先重试 git push origin dev，' -ForegroundColor Yellow
+    Write-Host '  仍失败则临时用 git push --no-verify origin dev（跳过本机 typecheck，CI 仍会跑）。' -ForegroundColor Yellow
     exit 1
   }
 } else {
