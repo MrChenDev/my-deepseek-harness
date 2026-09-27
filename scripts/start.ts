@@ -197,13 +197,18 @@ async function confirmLowMemory(): Promise<boolean> {
   }
 }
 
-function recordedStamp(): { head?: string } {
+function recordedStamp(): { head?: string; sourceCommit?: string } {
   try {
-    return JSON.parse(readFileSync(join(repositoryRoot, STAMP_FILE), 'utf8')) as { head?: string }
+    return JSON.parse(readFileSync(join(repositoryRoot, STAMP_FILE), 'utf8')) as { head?: string; sourceCommit?: string }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
     throw error
   }
+}
+
+/** Commit that last touched the trees whose sources are compiled into the artifacts. */
+function sourceCommit(): string {
+  return gitLines(['log', '-1', '--format=%H', '--', ...SOURCE_ROOTS])[0] ?? 'unknown'
 }
 
 /** Reasons that make the recorded artifacts stale, empty when they are current. */
@@ -211,9 +216,10 @@ function stalenessReasons(surface: Surface): string[] {
   const reasons: string[] = []
   const missing = surface.artifacts.filter(artifact => !existsSync(join(repositoryRoot, artifact)))
   if (missing.length > 0) reasons.push(`构建产物缺失（${missing.join('、')}）`)
-  const head = gitLines(['rev-parse', 'HEAD'])[0]
   const stamp = recordedStamp()
-  if (stamp.head !== head) reasons.push(stamp.head === undefined ? '没有构建记录' : '检出提交已变化')
+  const commit = sourceCommit()
+  if (stamp.sourceCommit === undefined) reasons.push('没有构建记录')
+  else if (stamp.sourceCommit !== commit) reasons.push('源码已更新（上游或你的改动）')
   const dirty = gitLines(['status', '--porcelain', '--', ...SOURCE_ROOTS])
   if (dirty.length > 0) reasons.push(`源码有未提交改动（${String(dirty.length)} 处）`)
   return reasons
@@ -223,7 +229,8 @@ function recordStamp(): void {
   const head = gitLines(['rev-parse', 'HEAD'])[0]
   const target = join(repositoryRoot, STAMP_FILE)
   mkdirSync(dirname(target), { recursive: true })
-  writeFileSync(target, `${JSON.stringify({ head, builtAt: new Date().toISOString() }, undefined, 2)}\n`)
+  const record = { sourceCommit: sourceCommit(), head, builtAt: new Date().toISOString() }
+  writeFileSync(target, `${JSON.stringify(record, undefined, 2)}\n`)
 }
 
 function lockPath(): string {
