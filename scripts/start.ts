@@ -10,7 +10,7 @@
  */
 
 import { execFileSync, spawn, type ChildProcess, type StdioOptions } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
@@ -44,9 +44,11 @@ const STAMP_FILE = '.dsh-build/start-stamp.json'
 /** Source trees whose uncommitted edits make the built artifacts stale. */
 const SOURCE_ROOTS = ['packages', 'apps', 'vendor', 'native'] as const
 
-/** Headroom below these bounds risks the fatal zone allocation `tsc` reports. */
-const FREE_PHYSICAL_FLOOR_GB = 4
+/** Commit headroom below this bound risks the fatal zone allocation `tsc` reports. */
 const COMMIT_HEADROOM_FLOOR_GB = 8
+
+/** Cooperative lock keeping two launchers from writing the same build trees. */
+const BUILD_LOCK_FILE = '.dsh-build/build.lock'
 
 /** Output tail retained for diagnosing a failed build. */
 const BUILD_TAIL_LINES = 300
@@ -147,12 +149,12 @@ function memorySnapshot(): MemorySnapshot | undefined {
   }
 }
 
-/** Reasons the current memory headroom is too small for a build, empty when it is enough. */
+/**
+ * Reasons the current commit headroom is too small for a build, empty when it is enough.
+ * Free physical memory is informational: Windows pages the build out instead of failing.
+ */
 function memoryWarning(snapshot: MemorySnapshot): string[] {
   const reasons: string[] = []
-  if (snapshot.freePhysicalGb < FREE_PHYSICAL_FLOOR_GB) {
-    reasons.push(`可用物理内存 ${String(snapshot.freePhysicalGb)} GB（建议 ≥ ${String(FREE_PHYSICAL_FLOOR_GB)} GB）`)
-  }
   const headroom = snapshot.commitLimitGb - snapshot.commitUsedGb
   if (headroom < COMMIT_HEADROOM_FLOOR_GB) {
     const used = `${String(snapshot.commitUsedGb)}/${String(snapshot.commitLimitGb)} GB`
@@ -222,6 +224,47 @@ function recordStamp(): void {
   const target = join(repositoryRoot, STAMP_FILE)
   mkdirSync(dirname(target), { recursive: true })
   writeFileSync(target, `${JSON.stringify({ head, builtAt: new Date().toISOString() }, undefined, 2)}\n`)
+}
+
+function lockPath(): string {
+  return join(repositoryRoot, BUILD_LOCK_FILE)
+}
+
+/** Process id recorded in the build lock, undefined when no lock file exists. */
+function lockHolder(): number | undefined {
+  try {
+    const pid = Number.parseInt(readFileSync(lockPath(), 'utf8').trim(), 10)
+    return Number.isSafeInteger(pid) && pid > 0 ? pid : undefined
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw error
+  }
+}
+
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+/** Take the build lock; returns the live holder's pid when another build owns it. */
+function acquireBuildLock(): number | undefined {
+  const holder = lockHolder()
+  if (holder !== undefined && holder !== process.pid && processAlive(holder)) return holder
+  mkdirSync(dirname(lockPath()), { recursive: true })
+  writeFileSync(lockPath(), `${String(process.pid)}\n`)
+  return undefined
+}
+
+function releaseBuildLock(): void {
+  try {
+    if (lockHolder() === process.pid) rmSync(lockPath(), { force: true })
+  } catch (error) {
+    console.warn(`释放构建锁失败（可忽略）：${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 function spawnPnpm(args: readonly string[], capture: boolean): ChildProcess {
@@ -315,20 +358,30 @@ async function main(): Promise<void> {
       process.exitCode = 1
       return
     }
-    const result = await runBuild()
-    if (result.code !== 0) {
-      const outOfMemory = result.code === OOM_EXIT_CODE || result.tail.some(line => OOM_SIGNATURE.test(line))
-      if (outOfMemory) {
-        console.error('')
-        console.error('构建因内存不足失败（V8 无法分配内存），已清理残留构建进程。')
-        printMemoryAdvice()
-      } else {
-        console.error(`构建失败（退出码 ${String(result.code)}），已停止启动。`)
-      }
-      process.exitCode = result.code
+    const holder = acquireBuildLock()
+    if (holder !== undefined) {
+      console.error(`另一个构建正在进行（PID ${String(holder)}）。等它结束，或用 --skip-build 直接启动。`)
+      process.exitCode = 1
       return
     }
-    recordStamp()
+    try {
+      const result = await runBuild()
+      if (result.code !== 0) {
+        const outOfMemory = result.code === OOM_EXIT_CODE || result.tail.some(line => OOM_SIGNATURE.test(line))
+        if (outOfMemory) {
+          console.error('')
+          console.error('构建因内存不足失败（V8 无法分配内存），已清理残留构建进程。')
+          printMemoryAdvice()
+        } else {
+          console.error(`构建失败（退出码 ${String(result.code)}），已停止启动。`)
+        }
+        process.exitCode = result.code
+        return
+      }
+      recordStamp()
+    } finally {
+      releaseBuildLock()
+    }
   }
   console.log('')
   process.exitCode = await runSurface(surface.script, options.forwarded)
