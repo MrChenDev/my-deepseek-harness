@@ -34,11 +34,8 @@ function Test-Administrator {
 }
 
 if (-not $DryRun -and -not (Test-Administrator)) {
-  Write-Host '需要管理员权限，正在请求提权（会出现 UAC 提示）…' -ForegroundColor Yellow
-  Start-Process powershell -Verb RunAs -ArgumentList @(
-    '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath
-  )
-  exit 0
+  Write-Host '需要管理员权限：请双击同目录的 fix-system-path.cmd（由它请求提权）。' -ForegroundColor Red
+  exit 1
 }
 
 $item = Get-Item -LiteralPath $key
