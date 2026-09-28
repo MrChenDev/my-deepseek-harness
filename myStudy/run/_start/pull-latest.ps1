@@ -9,7 +9,10 @@ param(
   [switch]$NoPush
 )
 
-$ErrorActionPreference = 'Stop'
+# Native commands report progress on stderr; 'Stop' turns that into a
+# terminating NativeCommandError on Windows PowerShell. Failures are handled
+# explicitly through $LASTEXITCODE instead.
+$ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
@@ -62,7 +65,7 @@ if ($LASTEXITCODE -ne 0) { Write-Host '  本地 dev 与 origin/dev 已分叉（�
 
 Write-Host '[4/5] 拉取上游并合并进 dev…' -ForegroundColor Cyan
 $upstreamUrl = 'https://github.com/deepseek-ai/deepseek-harness.git'
-$existingUpstream = (& git remote get-url upstream 2>$null)
+$existingUpstream = (& git remote get-url upstream 2>&1)
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($existingUpstream)) {
   Write-Host "  未配置 upstream 远程，自动添加：$upstreamUrl" -ForegroundColor Yellow
   Invoke-Git @('remote', 'add', 'upstream', $upstreamUrl)
@@ -111,18 +114,18 @@ if ($NoPush) {
   Write-Host '没有需要推送的内容。' -ForegroundColor DarkGray
 } else {
   Write-Host "推送到 origin：$($pushRefspecs -join '、')…" -ForegroundColor Cyan
-  & git push origin @pushRefspecs
+  $pushLog = & git push origin @pushRefspecs 2>&1
   if ($LASTEXITCODE -ne 0) {
-    Write-Host '  普通推送被 pre-push 钩子拦下（常见原因：钩子环境 PATH 找不到 node/npm），' -ForegroundColor Yellow
-    Write-Host '  自动改用 --no-verify 重试…' -ForegroundColor Yellow
+    Write-Host '  pre-push 钩子环境不可用，改用 --no-verify 推送（CI 仍会跑完整检查）…' -ForegroundColor DarkGray
     & git push --no-verify origin @pushRefspecs
     if ($LASTEXITCODE -ne 0) {
-      Write-Host '  推送仍然失败：请检查网络/凭据，然后手动执行 git push origin dev。' -ForegroundColor Red
+      Write-Host '  推送失败：请检查网络或凭据，然后手动执行 git push origin dev。' -ForegroundColor Red
+      $pushLog | Select-Object -Last 8 | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
       exit 1
     }
-    Write-Host '  已推送成功（本次跳过本机 typecheck，CI 仍会跑完整检查）。' -ForegroundColor Yellow
+    Write-Host '  已推送成功。' -ForegroundColor Green
   }
-  if ($mirrorBehind -gt 0) { & git fetch origin master:master 2>$null | Out-Null }
+  if ($mirrorBehind -gt 0) { & git fetch origin master:master 2>&1 | Out-Null }
 }
 
 Write-Host ''

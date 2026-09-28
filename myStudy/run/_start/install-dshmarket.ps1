@@ -12,7 +12,10 @@
 #>
 param()
 
-$ErrorActionPreference = 'Stop'
+# pnpm writes warnings and progress to stderr; 'Stop' turns those into
+# terminating NativeCommandErrors on Windows PowerShell. Exit codes are
+# checked explicitly instead.
+$ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $profilesRoot = Join-Path $env:USERPROFILE '.dsh\profiles'
