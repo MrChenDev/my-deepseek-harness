@@ -17,6 +17,10 @@ $ErrorActionPreference = 'Continue'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 Set-Location $repoRoot
+# Set-Location moves PowerShell's location only. .NET file APIs and child
+# processes (pnpm, git) read the process directory, which stays wherever the
+# double-clicked .cmd started.
+[Environment]::CurrentDirectory = $repoRoot
 Write-Host "仓库: $repoRoot" -ForegroundColor Cyan
 
 function Invoke-Git([string[]]$GitArguments) {
@@ -70,7 +74,8 @@ if ($untracked.Count -gt 0) {
 }
 
 $before = (& git rev-parse HEAD).Trim()
-$lockBefore = if (Test-Path 'pnpm-lock.yaml') { Get-FileSha256 'pnpm-lock.yaml' } else { '' }
+$lockFile = Join-Path $repoRoot 'pnpm-lock.yaml'
+$lockBefore = if (Test-Path -LiteralPath $lockFile) { Get-FileSha256 -Path $lockFile } else { '' }
 
 Write-Host '[1/5] 拉取 origin…' -ForegroundColor Cyan
 try {
@@ -124,7 +129,7 @@ if ($mirrorBehind -eq 0) {
 }
 
 $after = (& git rev-parse HEAD).Trim()
-$lockAfter = if (Test-Path 'pnpm-lock.yaml') { Get-FileSha256 'pnpm-lock.yaml' } else { '' }
+$lockAfter = if (Test-Path -LiteralPath $lockFile) { Get-FileSha256 -Path $lockFile } else { '' }
 if ($lockAfter -ne $lockBefore) {
   Write-Host '依赖清单有变化，执行 pnpm install…' -ForegroundColor Cyan
   & pnpm install
