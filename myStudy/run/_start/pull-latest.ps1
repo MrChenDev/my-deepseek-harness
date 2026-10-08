@@ -24,6 +24,19 @@ function Invoke-Git([string[]]$GitArguments) {
   if ($LASTEXITCODE -ne 0) { throw "git $($GitArguments -join ' ') 失败（退出码 $LASTEXITCODE）" }
 }
 
+# SHA-256 without Get-FileHash: that cmdlet is missing on constrained or older
+# Windows PowerShell hosts, and the lockfile comparison only needs the bytes.
+function Get-FileSha256 {
+  param([string]$Path)
+  $algorithm = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    return ([System.BitConverter]::ToString($algorithm.ComputeHash($bytes)) -replace '-', '')
+  } finally {
+    $algorithm.Dispose()
+  }
+}
+
 $branch = (& git rev-parse --abbrev-ref HEAD).Trim()
 if ($branch -ne 'dev') {
   Write-Host "当前在 $branch 分支，先切到 dev…" -ForegroundColor Yellow
@@ -57,7 +70,7 @@ if ($untracked.Count -gt 0) {
 }
 
 $before = (& git rev-parse HEAD).Trim()
-$lockBefore = if (Test-Path 'pnpm-lock.yaml') { (Get-FileHash 'pnpm-lock.yaml').Hash } else { '' }
+$lockBefore = if (Test-Path 'pnpm-lock.yaml') { Get-FileSha256 'pnpm-lock.yaml' } else { '' }
 
 Write-Host '[1/5] 拉取 origin…' -ForegroundColor Cyan
 try {
@@ -70,7 +83,10 @@ try {
 
 Write-Host '[2/5] 更新本地 master 指针（不切分支）…' -ForegroundColor Cyan
 & git fetch origin master:master
-if ($LASTEXITCODE -ne 0) { Write-Host '  master 不是快进更新，已跳过；需要时手动处理。' -ForegroundColor Yellow }
+if ($LASTEXITCODE -ne 0) {
+  Write-Host '  master 不是快进更新（本地 master 与 fork 的 master 已分叉），已跳过。' -ForegroundColor Yellow
+  Write-Host '  若本地 master 没有要保留的提交，可执行：git fetch origin +master:master' -ForegroundColor DarkGray
+}
 
 Write-Host '[3/5] 把 dev 快进到 origin/dev…' -ForegroundColor Cyan
 & git merge --ff-only origin/dev
@@ -108,7 +124,7 @@ if ($mirrorBehind -eq 0) {
 }
 
 $after = (& git rev-parse HEAD).Trim()
-$lockAfter = if (Test-Path 'pnpm-lock.yaml') { (Get-FileHash 'pnpm-lock.yaml').Hash } else { '' }
+$lockAfter = if (Test-Path 'pnpm-lock.yaml') { Get-FileSha256 'pnpm-lock.yaml' } else { '' }
 if ($lockAfter -ne $lockBefore) {
   Write-Host '依赖清单有变化，执行 pnpm install…' -ForegroundColor Cyan
   & pnpm install
