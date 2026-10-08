@@ -34,9 +34,22 @@ $status = @(& git status --porcelain)
 $tracked = @($status | Where-Object { $_ -notmatch '^\?\?' })
 $untracked = @($status | Where-Object { $_ -match '^\?\?' })
 if ($tracked.Count -gt 0) {
+  $mergeHead = (& git rev-parse --git-path MERGE_HEAD).Trim()
+  if (Test-Path -LiteralPath $mergeHead) {
+    $localHead = (& git rev-parse HEAD).Trim()
+    Write-Host '检测到一次中断的合并（MERGE_HEAD 存在），工作区停在合并中间状态。' -ForegroundColor Yellow
+    Write-Host ("  当前 HEAD: {0}" -f $localHead.Substring(0, 8)) -ForegroundColor DarkGray
+    Write-Host '  二选一处理：' -ForegroundColor Yellow
+    Write-Host '    a) 放弃这次中断的合并（推荐；之后重跑本脚本会正规重做一遍）：git merge --abort' -ForegroundColor Cyan
+    Write-Host '    b) 若这次合并就是你要的、冲突也都已解决：git commit --no-edit' -ForegroundColor Cyan
+    Write-Host '  禁止使用 git reset --hard / git checkout -- . / git clean -fd，会丢改动。' -ForegroundColor Red
+    exit 1
+  }
   Write-Host '有未提交的改动，先处理再拉取：' -ForegroundColor Red
-  $tracked | ForEach-Object { Write-Host "  $_" }
-  Write-Host '处理方式：git add <文件> 后 git commit；或 git stash -u 暂存。' -ForegroundColor Red
+  $tracked | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" }
+  if ($tracked.Count -gt 20) { Write-Host ("  ……（共 {0} 项，其余省略）" -f $tracked.Count) -ForegroundColor DarkGray }
+  Write-Host '处理方式（可逆）：git stash push -u -m "staged snapshot"，或 git add <文件> 后 git commit。' -ForegroundColor Red
+  Write-Host '提示：若这些改动是"整套上游合并内容"（笔记归档、README、快照一起动），多半是未完成的合并产物，stash 后重跑本脚本即可。' -ForegroundColor DarkGray
   exit 1
 }
 if ($untracked.Count -gt 0) {
