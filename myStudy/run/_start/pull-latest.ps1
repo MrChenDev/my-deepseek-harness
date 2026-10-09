@@ -41,6 +41,58 @@ function Get-FileSha256 {
   }
 }
 
+# A package the upstream removed keeps its former `lib/` and `node_modules/`
+# behind, and the build then compiles that dead output. Remove only directories
+# that carry no manifest and nothing but known build residue.
+function Remove-StalePackageResidue {
+  $cleanup = @'
+const fs = require('node:fs');
+const path = require('node:path');
+const root = process.argv[1];
+const residue = new Set(['lib', 'node_modules', '.typecheck', 'types', 'dist']);
+const removed = [];
+const skipped = [];
+const groups = fs.existsSync(path.join(root, 'packages')) ? fs.readdirSync(path.join(root, 'packages'), { withFileTypes: true }) : [];
+for (const group of groups) {
+  if (!group.isDirectory()) continue;
+  const groupDirectory = path.join(root, 'packages', group.name);
+  for (const entry of fs.readdirSync(groupDirectory, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const directory = path.join(groupDirectory, entry.name);
+    if (fs.existsSync(path.join(directory, 'package.json'))) continue;
+    const entries = fs.readdirSync(directory);
+    if (entries.some(name => !residue.has(name))) { skipped.push(path.relative(root, directory)); continue; }
+    const unlink = target => {
+      for (const child of fs.readdirSync(target, { withFileTypes: true })) {
+        const childPath = path.join(target, child.name);
+        if (fs.lstatSync(childPath).isSymbolicLink()) { fs.unlinkSync(childPath); continue; }
+        if (child.isDirectory()) unlink(childPath);
+      }
+    };
+    unlink(directory);
+    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 3 });
+    removed.push(path.relative(root, directory));
+  }
+}
+process.stdout.write(JSON.stringify({ removed, skipped }));
+'@
+  $result = & node -e $cleanup $repoRoot 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host '  清理残留目录失败（可忽略，继续拉取）。' -ForegroundColor Yellow
+    $result | Select-Object -Last 3 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    return
+  }
+  $parsed = $result | Select-Object -Last 1 | ConvertFrom-Json
+  if ($parsed.removed.Count -gt 0) {
+    Write-Host ("  清理上游已删除包的残留目录 {0} 个：{1}" -f $parsed.removed.Count, ($parsed.removed -join '、')) -ForegroundColor Cyan
+  } else {
+    Write-Host '  没有上游已删除包的残留目录。' -ForegroundColor DarkGray
+  }
+  if ($parsed.skipped.Count -gt 0) {
+    Write-Host ("  以下无 package.json 的目录含未知文件，未清理：{0}" -f ($parsed.skipped -join '、')) -ForegroundColor Yellow
+  }
+}
+
 $branch = (& git rev-parse --abbrev-ref HEAD).Trim()
 if ($branch -ne 'dev') {
   Write-Host "当前在 $branch 分支，先切到 dev…" -ForegroundColor Yellow
@@ -156,6 +208,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host '[5/5] 检查 fork 的 master 镜像…' -ForegroundColor Cyan
+Remove-StalePackageResidue
 $mirrorBehind = [int]((& git rev-list --count 'origin/master..upstream/master').Trim())
 if ($mirrorBehind -eq 0) {
   Write-Host '  已是上游最新镜像，无需更新。' -ForegroundColor DarkGray
