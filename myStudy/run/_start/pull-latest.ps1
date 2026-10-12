@@ -45,6 +45,7 @@ function Get-FileSha256 {
 # behind, and the build then compiles that dead output. Remove only directories
 # that carry no manifest and nothing but known build residue.
 function Remove-StalePackageResidue {
+  if ($null -eq $script:staleResidueRemoved) { $script:staleResidueRemoved = 0 }
   $cleanup = @'
 const fs = require('node:fs');
 const path = require('node:path');
@@ -85,6 +86,8 @@ process.stdout.write(JSON.stringify({ removed, skipped }));
   $parsed = $result | Select-Object -Last 1 | ConvertFrom-Json
   if ($parsed.removed.Count -gt 0) {
     Write-Host ("  清理上游已删除包的残留目录 {0} 个：{1}" -f $parsed.removed.Count, ($parsed.removed -join '、')) -ForegroundColor Cyan
+    # 链接与虚拟store仍指向旧路径，必须重装依赖，否则构建还会读到旧产物。
+    $script:staleResidueRemoved += $parsed.removed.Count
   } else {
     Write-Host '  没有上游已删除包的残留目录。' -ForegroundColor DarkGray
   }
@@ -218,8 +221,13 @@ if ($mirrorBehind -eq 0) {
 
 $after = (& git rev-parse HEAD).Trim()
 $lockAfter = if (Test-Path -LiteralPath $lockFile) { Get-FileSha256 -Path $lockFile } else { '' }
-if ($lockAfter -ne $lockBefore) {
-  Write-Host '依赖清单有变化，执行 pnpm install…' -ForegroundColor Cyan
+$residueCleaned = ($null -ne $script:staleResidueRemoved) -and ($script:staleResidueRemoved -gt 0)
+if ($lockAfter -ne $lockBefore -or $residueCleaned) {
+  if ($lockAfter -ne $lockBefore) {
+    Write-Host '依赖清单有变化，执行 pnpm install…' -ForegroundColor Cyan
+  } else {
+    Write-Host '刚清理了上游已删除包的残留目录，重装依赖以刷新指向旧路径的链接…' -ForegroundColor Cyan
+  }
   & pnpm install
   if ($LASTEXITCODE -ne 0) { Write-Host 'pnpm install 失败，请看上面的输出。' -ForegroundColor Red; exit 1 }
 } else {

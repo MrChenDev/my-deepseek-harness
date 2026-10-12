@@ -14,7 +14,11 @@
 
 ## pull-latest.cmd（拉取最新代码）
 
-依次执行五步：拉取 `origin`、更新本地 `master` 指针（不切分支）、把 `dev` 快进到 `origin/dev`、拉取 `upstream` 并合并进 `dev`、检查并快进 `master` 镜像；随后在 `pnpm-lock.yaml` 变化时自动 `pnpm install`，最后把 `dev`（以及需要更新的 master 镜像）推送到 origin。
+依次执行五步：拉取 `origin`、更新本地 `master` 指针（不切分支）、把 `dev` 快进到 `origin/dev`、拉取 `upstream` 并合并进 `dev`、检查并快进 `master` 镜像；随后在 `pnpm-lock.yaml` 变化**或刚清理过残留目录**时自动 `pnpm install`，最后把 `dev`（以及需要更新的 master 镜像）推送到 origin。
+
+第 5 步同时清理“上游已删除包”留下的残留目录（无 `package.json`、只含 `lib`/`node_modules` 等构建产物的 `packages/<组>/<包>` 目录）。上游搬包后旧路径的 `lib/` 还在，构建会照着旧代码去要已删除的导出，报 `MISSING_EXPORT`；清理后必须重装依赖，否则 `node_modules` 里的链接仍指向旧路径。留着 `package.json` 的目录只列出、不删除。
+
+`pnpm start` 触发的构建（`scripts/build.ts`）在编译前也会跑同一套清理，所以即使没走这一步、或残留从别的途径留下，构建同样能自愈。
 
 结尾会打印本地 `dev` / `master` 与 GitHub fork 的对照表：`与远端一致` 表示同步完成，`领先远端 N 个提交` 表示本地有新提交（脚本会尝试推送），`落后` 或 `分叉` 表示需要人工处理。
 
