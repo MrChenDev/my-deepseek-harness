@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
+import { removeStalePackageResidue } from './stale-package-residue.ts'
 
 type SurfaceName = 'web' | 'desktop'
 
@@ -294,8 +295,27 @@ function killProcessTree(child: ChildProcess): void {
   }
 }
 
+/**
+ * Delete stale package residue before the build, then relink dependencies when anything was removed.
+ * The removal leaves `node_modules` entries pointing at the deleted paths, so the build would still
+ * read the dead output until pnpm reinstalls.
+ */
+async function preparePackageDirectories(): Promise<void> {
+  const report = removeStalePackageResidue(repositoryRoot)
+  if (report.removed.length > 0) {
+    console.log(`清理上游已删除包的残留目录 ${String(report.removed.length)} 个：${report.removed.join('、')}`)
+    console.log('  重装依赖以刷新指向旧路径的链接…')
+    const installCode = await runPnpmCommand(['install'])
+    if (installCode !== 0) console.warn('  pnpm install 未成功；构建若报模块缺失，请手动执行 pnpm install。')
+  }
+  for (const skipped of report.skipped) {
+    console.log(`  保留未跟踪的包目录（含 package.json 或非构建产物）：${skipped}`)
+  }
+}
+
 /** Run the build, streaming its output while retaining a tail for OOM diagnosis. */
 async function runBuild(): Promise<{ code: number; tail: string[] }> {
+  await preparePackageDirectories()
   const child = spawnPnpm(['run', 'build'], true)
   const tail: string[] = []
   const collect = (chunk: Buffer, target: NodeJS.WriteStream): void => {
@@ -326,15 +346,20 @@ async function runBuild(): Promise<{ code: number; tail: string[] }> {
   }
 }
 
-/** Run one pnpm-owned command in the foreground and resolve with its exit code. */
-async function runSurface(script: string, forwarded: readonly string[]): Promise<number> {
-  const child = spawnPnpm(['run', script, ...forwarded], false)
+/** Run one pnpm command in the foreground and resolve with its exit code. */
+async function runPnpmCommand(args: readonly string[]): Promise<number> {
+  const child = spawnPnpm(args, false)
   return await new Promise<number>((resolveExit, reject) => {
     child.once('error', reject)
     child.once('exit', (code, signal) => {
       resolveExit(code ?? (signal === null ? 1 : 0))
     })
   })
+}
+
+/** Run one pnpm-owned surface script in the foreground and resolve with its exit code. */
+async function runSurface(script: string, forwarded: readonly string[]): Promise<number> {
+  return await runPnpmCommand(['run', script, ...forwarded])
 }
 
 async function main(): Promise<void> {
