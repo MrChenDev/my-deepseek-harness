@@ -6,7 +6,10 @@
 #>
 param(
   # 跳过全部自动 push（dev 与 master 镜像）。
-  [switch]$NoPush
+  [switch]$NoPush,
+  # 推送前跑本地 pre-push 检查（全量 typecheck，通常 6-15 分钟且期间终端无输出）。
+  # 默认跳过：CI 会跑完整门禁，本地检查只在你主动要跑时才跑。
+  [switch]$Verify
 )
 
 # Native commands report progress on stderr; 'Stop' turns that into a
@@ -242,8 +245,19 @@ if ($NoPush) {
   Write-Host '已按 -NoPush 跳过 push。' -ForegroundColor DarkGray
 } elseif ($pushRefspecs.Count -eq 0) {
   Write-Host '没有需要推送的内容。' -ForegroundColor DarkGray
+} elseif (-not $Verify) {
+  Write-Host "推送到 origin：$($pushRefspecs -join '、')…" -ForegroundColor Cyan
+  Write-Host '  已跳过本地 pre-push 类型检查（CI 会跑完整门禁）；想在本地先跑用 pull-latest.cmd -Verify。' -ForegroundColor DarkGray
+  & git push --no-verify origin @pushRefspecs
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host '  推送失败：请检查网络或凭据，然后手动执行 git push origin dev。' -ForegroundColor Red
+    exit 1
+  }
+  Write-Host '  已推送成功。' -ForegroundColor Green
+  if ($mirrorBehind -gt 0) { & git fetch origin master:master 2>&1 | Out-Null }
 } else {
   Write-Host "推送到 origin：$($pushRefspecs -join '、')…" -ForegroundColor Cyan
+  Write-Host '  正在跑本地 pre-push 类型检查（全量 typecheck，通常 6-15 分钟，期间终端无输出，请不要关窗口）…' -ForegroundColor DarkGray
   $pushLog = & git push origin @pushRefspecs 2>&1
   if ($LASTEXITCODE -ne 0) {
     Write-Host '  pre-push 钩子环境不可用，改用 --no-verify 推送（CI 仍会跑完整检查）…' -ForegroundColor DarkGray
@@ -253,8 +267,8 @@ if ($NoPush) {
       $pushLog | Select-Object -Last 8 | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
       exit 1
     }
-    Write-Host '  已推送成功。' -ForegroundColor Green
   }
+  Write-Host '  已推送成功。' -ForegroundColor Green
   if ($mirrorBehind -gt 0) { & git fetch origin master:master 2>&1 | Out-Null }
 }
 

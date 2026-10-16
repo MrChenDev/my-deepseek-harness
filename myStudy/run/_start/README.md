@@ -18,11 +18,13 @@
 
 第 5 步同时清理“上游已删除包”留下的残留目录（无 `package.json`、只含 `lib`/`node_modules` 等构建产物的 `packages/<组>/<包>` 目录）。上游搬包后旧路径的 `lib/` 还在，构建会照着旧代码去要已删除的导出，报 `MISSING_EXPORT`；清理后必须重装依赖，否则 `node_modules` 里的链接仍指向旧路径。留着 `package.json` 的目录只列出、不删除。
 
-`pnpm start` 触发的构建（`scripts/build.ts`）在编译前也会跑同一套清理，所以即使没走这一步、或残留从别的途径留下，构建同样能自愈。
+`pnpm start`（`scripts/start.ts`）在构建前会跑同一套清理（`scripts/stale-package-residue.ts`）：删掉残留后自动 `pnpm install` 刷新指向旧路径的链接，再开始构建，所以即使没走这一步、或残留从别的途径留下，构建同样能自愈。
 
 结尾会打印本地 `dev` / `master` 与 GitHub fork 的对照表：`与远端一致` 表示同步完成，`领先远端 N 个提交` 表示本地有新提交（脚本会尝试推送），`落后` 或 `分叉` 表示需要人工处理。
 
 注意两点：脚本只处理 `dev` 和 master 镜像，工作分支始终是 `dev`；如果有未提交的已跟踪文件改动，它会列出文件并中止，处理方式是把改动提交或用 `git stash -u` 暂存。
+
+推送默认跳过本地的 `pre-push` 检查（该钩子只跑一条 `pnpm run typecheck`：全量类型检查，通常 6–15 分钟，期间终端不输出任何东西，看起来像卡住）。跳过之后推送只花几十秒，GitHub CI 仍会跑完整门禁；想在本地先跑检查时用 `pull-latest.cmd -Verify`，脚本会先打印"正在跑本地 pre-push 类型检查"再推送。
 
 ## upgrade-plugins.cmd（升级插件）
 
@@ -57,6 +59,7 @@
 | `Plugin X@v is incompatible with dsh V` | 插件版本没覆盖当前 dsh 版本 | 双击 `upgrade-plugins.cmd`；仍不兼容时按它打印的 `allow-version` 命令放行 |
 | `minimumReleaseAge` | 新版本保护期未过 | 在该 profile 的 `pnpm-workspace.yaml` 加 `minimumReleaseAgeExclude: [包@版本]` |
 | `pre-push 钩子环境不可用，改用 --no-verify 推送` | 本机 PATH 被破坏，钩子里的 node/npm 找不到 | 检查系统 PATH 是否又出现带引号的条目（见下节） |
+| 停在 `推送到 origin：…` 很久不动 | 只在 `-Verify` 模式下会发生：本地 `pre-push` 全量类型检查在跑，期间无输出 | 等它跑完；默认模式已跳过该检查，推送只需几十秒 |
 | `无法访问 GitHub` | 网络或加速器问题 | 打开加速器后重跑脚本 |
 
 ## PATH 维护备注
