@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { removeStalePackageResidue } from './stale-package-residue.ts'
 
 type SurfaceName = 'web' | 'desktop'
@@ -56,6 +57,12 @@ const BUILD_TAIL_LINES = 300
 
 /** Exit status a Windows process reports after a fatal V8 allocation failure. */
 const OOM_EXIT_CODE = 2147483651
+
+/** Storage packages may also be installed in a user's Web profile, ahead of this checkout's copies. */
+const WEB_PROFILE_STORAGE_PACKAGES = [
+  { name: '@deepseek-ai/dsh-storage', manifest: 'packages/storage/storage/package.json' },
+  { name: '@deepseek-ai/dsh-storage-domain', manifest: 'packages/storage/storage-domain/package.json' },
+] as const
 
 const OOM_SIGNATURE = /Fatal process out of memory|JavaScript heap out of memory|Zone allocation/iu
 
@@ -238,6 +245,130 @@ function lockPath(): string {
   return join(repositoryRoot, BUILD_LOCK_FILE)
 }
 
+interface PackageManifest {
+  readonly version?: unknown
+  readonly dependencies?: unknown
+}
+
+interface ProfileStorageUpdate {
+  readonly name: string
+  readonly version: string
+}
+
+/** Read a JSON package manifest and reject malformed files before using package metadata. */
+function packageManifest(path: string): PackageManifest {
+  const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`${path}: package manifest must be an object`)
+  }
+  return value as PackageManifest
+}
+
+/** Read a manifest's regular dependencies after checking its JSON type. */
+function packageDependencies(manifest: PackageManifest, path: string): Record<string, unknown> {
+  const dependencies = manifest.dependencies
+  if (dependencies === undefined) return {}
+  if (typeof dependencies !== 'object' || dependencies === null || Array.isArray(dependencies)) {
+    throw new Error(`${path}: package dependencies must be an object`)
+  }
+  return dependencies as Record<string, unknown>
+}
+
+/** Resolve storage dependencies already declared by the user's Web profile to this checkout's versions. */
+function profileStorageUpdates(): { profile: string; updates: ProfileStorageUpdate[] } | undefined {
+  const profile = join(resolveDshHome(), 'profiles', 'web')
+  const packageFile = join(profile, 'package.json')
+  if (!existsSync(packageFile)) return undefined
+  const dependencies = packageDependencies(packageManifest(packageFile), packageFile)
+  const updates: ProfileStorageUpdate[] = []
+  for (const item of WEB_PROFILE_STORAGE_PACKAGES) {
+    const current = dependencies[item.name]
+    if (typeof current !== 'string' || /^(?:file:|link:|git\+|https?:|npm:)/u.test(current)) continue
+    const version = packageManifest(join(repositoryRoot, item.manifest)).version
+    if (typeof version !== 'string' || version.length === 0) {
+      throw new Error(`${item.manifest}: package version is missing`)
+    }
+    if (current !== version) updates.push({ name: item.name, version })
+  }
+  return { profile, updates }
+}
+
+/** Update existing top-level pnpm overrides without reserializing user YAML or dropping comments. */
+function updateProfileStorageOverrides(source: string, updates: readonly ProfileStorageUpdate[]): string {
+  const names = new Map(updates.map(update => [update.name, update.version]))
+  let inOverrides = false
+  return source.split(/(?<=\n)/u).map((line) => {
+    const content = line.replace(/\r?\n$/u, '')
+    if (!inOverrides) {
+      inOverrides = /^overrides:\s*(?:#.*)?$/u.test(content)
+      return line
+    }
+    if (content.length > 0 && !/^[ \t]/u.test(content)) {
+      inOverrides = /^overrides:\s*(?:#.*)?$/u.test(content)
+      return line
+    }
+    const colon = content.indexOf(':')
+    if (colon < 0) return line
+    const key = content.slice(0, colon).trim().replace(/^['"]|['"]$/gu, '')
+    const version = names.get(key)
+    if (version === undefined) return line
+    const prefix = content.slice(0, colon + 1)
+    const rawValue = content.slice(colon + 1)
+    const match = rawValue.match(/^(\s*)(['"]?)([^'"\s]+)\2(\s*(?:#.*)?)$/u)
+    if (match === null) throw new Error(`pnpm-workspace.yaml: cannot safely update override for ${key}`)
+    const newline = line.endsWith('\r\n') ? '\r\n' : line.endsWith('\n') ? '\n' : ''
+    return `${prefix}${match[1]}${match[2]}${version}${match[2]}${match[4]}${newline}`
+  }).join('')
+}
+
+/** Synchronize profile-pinned storage packages before Web boot; never start with a known version mismatch. */
+async function syncWebProfileStorage(): Promise<boolean> {
+  const plan = profileStorageUpdates()
+  if (plan === undefined || plan.updates.length === 0) return true
+  const packageFile = join(plan.profile, 'package.json')
+  const lockFile = join(plan.profile, 'pnpm-lock.yaml')
+  const workspaceFile = join(plan.profile, 'pnpm-workspace.yaml')
+  const files = [packageFile, lockFile, workspaceFile]
+  const before = new Map(files.map(path => [path, existsSync(path) ? readFileSync(path) : undefined]))
+  console.log(`Web profile 存储包版本与当前源码不一致，正在同步：${plan.updates.map(item => `${item.name}@${item.version}`).join('、')}`)
+  try {
+    if (existsSync(workspaceFile)) {
+      const source = readFileSync(workspaceFile, 'utf8')
+      const updated = updateProfileStorageOverrides(source, plan.updates)
+      if (updated !== source) writeFileSync(workspaceFile, updated)
+    }
+    const addArguments = plan.updates.map(item => `${item.name}@${item.version}`)
+    const code = await runPnpmCommand(['dsh', 'plugin', '--profile', 'web', 'add', ...addArguments])
+    if (code !== 0) throw new Error(`pnpm exited with code ${String(code)}`)
+    const after = packageDependencies(packageManifest(packageFile), packageFile)
+    const unresolved = plan.updates.filter((item) => {
+      if (after[item.name] !== item.version) return true
+      const installed = join(plan.profile, 'node_modules', ...item.name.split('/'), 'package.json')
+      return !existsSync(installed) || packageManifest(installed).version !== item.version
+    })
+    if (unresolved.length > 0) {
+      throw new Error(`profile did not install ${unresolved.map(item => `${item.name}@${item.version}`).join(', ')}`)
+    }
+    return true
+  } catch (error) {
+    let rollbackFailure: unknown
+    for (const [path, content] of before) {
+      try {
+        if (content === undefined) rmSync(path, { force: true })
+        else writeFileSync(path, content)
+      } catch (restoreError) {
+        rollbackFailure ??= restoreError
+      }
+    }
+    const detail = error instanceof Error ? error.message : String(error)
+    const rollback = rollbackFailure === undefined
+      ? 'profile manifests and lockfile were restored'
+      : `profile file restoration also failed: ${rollbackFailure instanceof Error ? rollbackFailure.message : String(rollbackFailure)}`
+    console.error(`Web profile 存储包同步失败，已停止启动。${detail}；${rollback}。请检查网络与 profile 包管理状态后重试。`)
+    return false
+  }
+}
+
 /** Process id recorded in the build lock, undefined when no lock file exists. */
 function lockHolder(): number | undefined {
   try {
@@ -368,8 +499,12 @@ async function main(): Promise<void> {
   const surface = SURFACES[surfaceName]
   const reasons = options.skipBuild ? [] : stalenessReasons(surface)
   const needsBuild = options.forceBuild || reasons.length > 0
+  const storageSync = surfaceName === 'web' ? profileStorageUpdates() : undefined
   const planned: string[] = []
   if (needsBuild) planned.push('pnpm run build')
+  if (storageSync !== undefined && storageSync.updates.length > 0) {
+    planned.push('同步 Web profile 存储包版本')
+  }
   planned.push(`pnpm run ${surface.script}`)
   console.log('')
   console.log(`启动目标：${surface.label}（端口 ${String(surface.port)}）`)
@@ -414,6 +549,10 @@ async function main(): Promise<void> {
     } finally {
       releaseBuildLock()
     }
+  }
+  if (surfaceName === 'web' && !await syncWebProfileStorage()) {
+    process.exitCode = 1
+    return
   }
   console.log('')
   process.exitCode = await runSurface(surface.script, options.forwarded)
