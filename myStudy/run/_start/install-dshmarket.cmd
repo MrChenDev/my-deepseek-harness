@@ -1,5 +1,5 @@
 @echo off
 chcp 65001 >nul
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-dshmarket.ps1"
+node "%~dp0install-dshmarket.mjs" %*
 echo.
 pause

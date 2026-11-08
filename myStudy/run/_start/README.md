@@ -4,14 +4,14 @@
 
 ## 脚本清单
 
-| 双击这个 | 作用 | 什么时候用 |
-| --- | --- | --- |
-| `pull-latest.cmd` | 拉取上游、同步 dev 与 master 镜像、自动 push | 每次上游有新提交时 |
-| `upgrade-plugins.cmd` | 把两个 profile 的插件升到最新，并检查与当前 dsh 是否兼容 | dsh 升级后，或插件报"不兼容"时 |
-| `install-dshmarket.cmd` | 安装或升级 `dshmarket`（插件市场）到两个 profile | 新机器上第一次装插件市场时 |
-| `sync-dsh-profile.cmd` | 一键同步插件声明、profile 配置和 skills（应用基线 + 导出本机 + 提交推送） | 换机，或 A 机装完插件后 |
+| Windows | Linux（Fedora/Kali/Rocky） | 作用 | 什么时候用 |
+| --- | --- | --- | --- |
+| `pull-latest.cmd` | `pull-latest.sh` | 拉取上游、同步 dev 与 master 镜像、自动 push | 每次上游有新提交时 |
+| `upgrade-plugins.cmd` | `upgrade-plugins.sh` | 把两个 profile 的插件升到最新，并检查与当前 dsh 是否兼容 | dsh 升级后，或插件报"不兼容"时 |
+| `install-dshmarket.cmd` | `install-dshmarket.sh` | 安装或升级 `dshmarket`（插件市场）到两个 profile | 新机器上第一次装插件市场时 |
+| `sync-dsh-profile.cmd` | `sync-dsh-profile.sh` | 一键同步插件声明、profile 配置和 skills（应用基线 + 导出本机 + 提交推送） | 换机，或 A 机装完插件后 |
 
-每个 `.cmd` 只是双击入口，真正的逻辑在同名的 `.ps1` 文件里（`sync-dsh-profile` 的逻辑在 `.mjs` 里）；要调整行为就改对应文件。
+Windows 双击 `.cmd`，Linux 执行同名的 `.sh`；两个入口都调用同一份 Node 逻辑（`.mjs`），行为一致。旧的 `.ps1` 保留但已不再被入口调用。公共参数：`--dry-run` 只检查不写入；`pull-latest` 另支持 `--no-push`、`--verify`。
 
 ## pull-latest.cmd（拉取最新代码）
 
