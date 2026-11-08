@@ -263,6 +263,7 @@ function dirDigest(dir) {
 /** 把本机状态导出并保留合并进仓库基线。 */
 function exportBaseline() {
   const baseline = loadBaseline()
+  const before = JSON.stringify({ ...baseline, updatedAt: undefined, updatedBy: undefined })
   const conflicts = []
   for (const name of PROFILES) {
     const local = readLocalProfile(name)
@@ -297,10 +298,15 @@ function exportBaseline() {
   const globalPatch = readYamlFile(join(DSH_HOME, 'cordis.patch.yml')) ?? []
   baseline.globalPatch = mergePatchEntries(baseline.globalPatch, Array.isArray(globalPatch) ? globalPatch : [], '~/.dsh/cordis.patch.yml', conflicts)
   baseline.skills = exportSkills(baseline, conflicts)
-  baseline.updatedAt = new Date().toISOString()
-  baseline.updatedBy = hostname()
-  writeJsonFile(BASELINE_PATH, baseline)
-  info(`\n基线已写入：${BASELINE_PATH}`)
+  const after = JSON.stringify({ ...baseline, updatedAt: undefined, updatedBy: undefined })
+  if (after !== before) {
+    baseline.updatedAt = new Date().toISOString()
+    baseline.updatedBy = hostname()
+    writeJsonFile(BASELINE_PATH, baseline)
+    info(`\n基线已更新：${BASELINE_PATH}`)
+  } else {
+    info('\n基线没有变化')
+  }
   reportConflicts(conflicts)
 }
 
