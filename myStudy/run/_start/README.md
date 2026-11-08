@@ -9,8 +9,9 @@
 | `pull-latest.cmd` | 拉取上游、同步 dev 与 master 镜像、自动 push | 每次上游有新提交时 |
 | `upgrade-plugins.cmd` | 把两个 profile 的插件升到最新，并检查与当前 dsh 是否兼容 | dsh 升级后，或插件报"不兼容"时 |
 | `install-dshmarket.cmd` | 安装或升级 `dshmarket`（插件市场）到两个 profile | 新机器上第一次装插件市场时 |
+| `sync-dsh-profile.cmd` | 一键同步插件声明、profile 配置和 skills（应用基线 + 导出本机 + 提交推送） | 换机，或 A 机装完插件后 |
 
-每个 `.cmd` 只是双击入口，真正的逻辑在同名的 `.ps1` 文件里；要调整行为就改 `.ps1`。
+每个 `.cmd` 只是双击入口，真正的逻辑在同名的 `.ps1` 文件里（`sync-dsh-profile` 的逻辑在 `.mjs` 里）；要调整行为就改对应文件。
 
 ## pull-latest.cmd（拉取最新代码）
 
@@ -39,6 +40,32 @@
 对 `desktop` 和 `web` 两个 profile：补齐 `pnpm-workspace.yaml` 里的 `allowBuilds`（Git 来源的包需要执行构建脚本）与 `minimumReleaseAgeExclude`（放行刚发布的新版本）；如果发现已装的是 Git 依赖，先移除再安装 npm 版；最后打印两个 profile 里实际生效的版本。
 
 安装 npm 发布版可以完全避开"包需要执行构建脚本"的报错，所以优先用它。命令等价于在 profile 目录执行 `pnpm add dshmarket@<最新版本>`。
+
+## sync-dsh-profile.cmd（跨机器同步插件与配置）
+
+把本机 `~/.dsh` 里的插件声明、profile 配置和 skills 同步到仓库，或从仓库合并到本机。只同步声明，不同步 `node_modules`、会话、凭据和存储数据。
+
+同步范围：
+
+- `profiles/web|desktop/package.json`：`dependencies` 和 `dsh.profile.bundles`
+- `profiles/web|desktop/pnpm-workspace.yaml`：`allowBuilds`、`minimumReleaseAgeExclude`、`overrides`
+- `profiles/web|desktop/cordis.patch.yml`：按 `id` 合并
+- `~/.dsh/cordis.patch.yml`：全局 patch，按 `id` 合并（`insert` 结构按内部 `id`）
+- `~/.dsh/skills/`：整目录复制（排除 `__pycache__`、`*.pyc`、`.venv`、`node_modules` 等）
+
+双击默认执行**一键同步**，不需要选菜单：
+
+1. 检查仓库状态，快进到 `origin/dev`；
+2. 把仓库基线合并应用到本机（冲突保留本机版本并报告，改动前自动备份到 `~/.dsh/backups/profile-sync-*`）；
+3. 把本机状态合并导出到 `dsh-profile-baseline.json` 和 `dsh-skills/`；
+4. 基线有变化时自动提交并推送到 `origin/dev`；
+5. 对改动过的 profile 自动执行 `pnpm install`，完成后直接 `pnpm start` 即可。
+
+需要单独操作时也可以指定模式：`export`（只导出）、`apply`（只应用）、`diff`（只看差异，不写文件）。
+
+`link:` 路径用 `${DSH_REPO}` 占位，应用时按本机仓库路径还原，所以 Windows 和 Linux 可以共用同一份基线。
+
+Linux 上执行：`node myStudy/run/_start/sync-dsh-profile.mjs`（也可加 `export` / `apply` / `diff`）。同名 skill 内容不同时，加 `--force-skill <名称>` 才会用基线覆盖本机。
 
 ## 日常标准流程
 

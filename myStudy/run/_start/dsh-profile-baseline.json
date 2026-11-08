@@ -1,0 +1,334 @@
+{
+  "version": 1,
+  "updatedAt": "2026-11-08T14:45:23.349Z",
+  "updatedBy": "ChenChen",
+  "globalPatch": [
+    {
+      "insert": [
+        {
+          "id": "rea-mcp",
+          "name": "@deepseek-ai/dsh-mcp-client",
+          "config": {
+            "serverName": "rea",
+            "transport": "stdio",
+            "command": "cmd.exe",
+            "args": [
+              "/d",
+              "/c",
+              "npx",
+              "-y",
+              "rea-agents@6.5.0",
+              "mcp"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "profiles": {
+    "web": {
+      "dependencies": {
+        "@deepseek-ai/dsh-subagent-claude-code": "link:${DSH_REPO}/packages/subagent/subagent-claude-code",
+        "@deepseek-ai/dsh-subagent-codex": "link:${DSH_REPO}/packages/subagent/subagent-codex",
+        "@michengai/dsh-pua": "1.0.6",
+        "@michengai/dsh-skills-manager": "1.2.29",
+        "deepseek-harness-wallet": "^0.3.13",
+        "dsh-mobile-use": "1.4.34",
+        "dsh-pet": "0.4.1",
+        "dsh-profile-stats": "2.4.12",
+        "dsh-whale-widget": "^0.4.2",
+        "dshmarket": "1.73.10"
+      },
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "dshmarket",
+        "dsh-whale-widget",
+        "deepseek-harness-wallet",
+        "dsh-pet",
+        "@deepseek-ai/dsh-experimental-voice-input-bundle",
+        "@deepseek-ai/dsh-experimental-auto-review",
+        "@deepseek-ai/dsh-experimental-inspector-profile",
+        "@deepseek-ai/dsh-experimental-cot-translation-bundle",
+        "@deepseek-ai/dsh-subagent-codex",
+        "@deepseek-ai/dsh-experimental-tool-worktree",
+        "@deepseek-ai/dsh-experimental-terminal-bundle",
+        "@deepseek-ai/dsh-experimental-ralph-bundle",
+        "@deepseek-ai/dsh-experimental-session-search",
+        "@deepseek-ai/dsh-experimental-session-titles-bundle",
+        "@deepseek-ai/dsh-experimental-badge-skill-bundle",
+        "@deepseek-ai/dsh-subagent-claude-code",
+        "@deepseek-ai/dsh-experimental-plugin-market-bundle",
+        "@michengai/dsh-pua",
+        "@michengai/dsh-skills-manager",
+        "@deepseek-ai/dsh-experimental-forge-bundle",
+        "@deepseek-ai/dsh-personalized-recommendations",
+        "dsh-mobile-use",
+        "dsh-profile-stats"
+      ],
+      "workspace": {
+        "allowBuilds": {
+          "dshmarket": true,
+          "dshmarket@https://github.com/dsh-market/dsh-market.git": true
+        },
+        "minimumReleaseAgeExclude": [
+          "dsh-whale-widget@0.3.2",
+          "@michengai/dsh-skills-manager@1.2.13 || 1.2.18",
+          "@michengai/dsh-pua@1.0.3 || 1.0.4",
+          "dshmarket@1.73.5",
+          "dsh-mobile-use@1.4.34",
+          "dsh-profile-stats@2.4.12"
+        ]
+      },
+      "patch": [
+        {
+          "id": "wallet",
+          "disabled": true
+        },
+        {
+          "id": "dsh-whale-widget",
+          "disabled": true
+        },
+        {
+          "id": "ui-settings-general",
+          "name": "@deepseek-ai/dsh-client-ui-settings-general",
+          "config": {
+            "welcomeNoticeVersion": "2026-09-28.1"
+          }
+        },
+        {
+          "id": "permission",
+          "name": "@deepseek-ai/dsh-permission-presets",
+          "config": {
+            "presets": {
+              "read-only": {
+                "sandbox": "read-only",
+                "approval": "ask"
+              },
+              "workspace-write": {
+                "sandbox": "workspace-write",
+                "approval": "ask"
+              },
+              "danger-full-access": {
+                "sandbox": "danger-full-access",
+                "approval": "never"
+              }
+            },
+            "defaultPreset": "danger-full-access"
+          }
+        },
+        {
+          "id": "agent-default-model",
+          "name": "@deepseek-ai/dsh-agent-default-model",
+          "config": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "high"
+          }
+        },
+        {
+          "id": "llm-deepseek",
+          "name": "@deepseek-ai/dsh-llm-deepseek",
+          "config": {
+            "models": [
+              {
+                "id": "deepseek-flash",
+                "name": "deepseek-flash",
+                "contextWindow": 1000000,
+                "inputModalities": [
+                  "text",
+                  "image"
+                ],
+                "imagePixelBudget": 640000,
+                "imageMaxBytes": 1048576,
+                "systemPromptUpdate": "in-history"
+              },
+              {
+                "id": "deepseek-v4-pro",
+                "name": "deepseek-v4-pro",
+                "description": "Stronger agentic coding, knowledge, and difficult reasoning; suited to complex or quality-critical tasks at higher cost.",
+                "contextWindow": 1000000,
+                "inputModalities": [
+                  "text"
+                ]
+              },
+              {
+                "id": "deepseek-v4-flash-vision-exp",
+                "name": "DeepSeek-V4-Flash-Vision-Exp",
+                "contextWindow": 1000000,
+                "inputModalities": [
+                  "text",
+                  "image"
+                ],
+                "imagePixelBudget": 640000,
+                "imageMaxBytes": 1048576
+              }
+            ]
+          }
+        },
+        {
+          "id": "subagent-model-selection-settings",
+          "name": "@deepseek-ai/dsh-tool-subagent/model-selection-settings",
+          "config": {
+            "enabled": true,
+            "allowedModels": [
+              {
+                "provider": "deepseek-official",
+                "model": "deepseek-flash"
+              },
+              {
+                "provider": "deepseek-account",
+                "model": "deepseek-flash"
+              }
+            ]
+          }
+        },
+        {
+          "id": "web",
+          "name": "@deepseek-ai/dsh-web",
+          "config": {
+            "searchProvider": "deepseek-search-api",
+            "fetchProvider": "deepseek-fetch-api"
+          }
+        }
+      ]
+    },
+    "desktop": {
+      "dependencies": {
+        "@michengai/dsh-automation": "1.0.18",
+        "@michengai/dsh-im-connect": "^1.0.25",
+        "@michengai/dsh-pua": "^1.0.6",
+        "deepseek-harness-hello-kitty-suite": "github:Angel2518975237/deepseek-harness-hello-kitty-suite#1b8cd7e74ae9bb5cc53b82d6ce55dc134d2cc818",
+        "ds-bot": "github:QingJ01/DS-Bot-App#d6b187709b9a1045f63bfb77efff7ff546e39b36&path:ds-bot",
+        "dsh-pet": "0.4.1",
+        "dsh-startup-screen": "github:6shenhonghong9/dsh-startup-screen",
+        "dshmarket": "1.73.11"
+      },
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@deepseek-ai/dsh-experimental-agent-team-profile",
+        "@deepseek-ai/dsh-experimental-auto-review",
+        "@deepseek-ai/dsh-experimental-voice-input-bundle",
+        "dsh-pet",
+        "dsh-startup-screen",
+        "ds-bot",
+        "@deepseek-ai/dsh-experimental-inspector-profile",
+        "@deepseek-ai/dsh-experimental-session-search",
+        "@deepseek-ai/dsh-experimental-ralph-bundle",
+        "@deepseek-ai/dsh-experimental-badge-skill-bundle",
+        "@deepseek-ai/dsh-experimental-session-titles-bundle",
+        "@deepseek-ai/dsh-experimental-plugin-market-bundle",
+        "@deepseek-ai/dsh-experimental-terminal-bundle",
+        "@deepseek-ai/dsh-experimental-cot-translation-bundle",
+        "@deepseek-ai/dsh-experimental-tool-worktree",
+        "@michengai/dsh-pua",
+        "@michengai/dsh-im-connect",
+        "@michengai/dsh-automation",
+        "dshmarket"
+      ],
+      "workspace": {
+        "allowBuilds": {
+          "dshmarket": true,
+          "dshmarket@https://github.com/dsh-market/dsh-market.git": true,
+          "dshmarket@https://codeload.github.com/QingJ01/DS-Bot-App/tar.gz/d6b187709b9a1045f63bfb77efff7ff546e39b36#path:ds-bot": true,
+          "protobufjs@7.6.6": true
+        },
+        "minimumReleaseAgeExclude": [
+          "dsh-pet@0.3.1",
+          "ds-bot@0.1.7",
+          "dshmarket@1.73.5 || 1.73.11",
+          "@michengai/dsh-automation@1.0.18"
+        ]
+      },
+      "patch": [
+        {
+          "id": "ui-chat",
+          "name": "@deepseek-ai/dsh-client-ui-chat",
+          "config": {
+            "transcriptView": "standard",
+            "performanceUsage": "detailed"
+          }
+        },
+        {
+          "id": "ui-settings",
+          "name": "@deepseek-ai/dsh-client-ui-settings",
+          "config": {
+            "enabled": true
+          }
+        },
+        {
+          "id": "ui-settings-account",
+          "name": "@deepseek-ai/dsh-client-ui-settings-account",
+          "config": {
+            "version": 1,
+            "step": "done",
+            "usage": "detailed",
+            "developerTools": true,
+            "purpose": null,
+            "process": "standard",
+            "completion": "api-key"
+          }
+        },
+        {
+          "id": "permission",
+          "name": "@deepseek-ai/dsh-permission-presets",
+          "config": {
+            "presets": {
+              "read-only": {
+                "sandbox": "read-only",
+                "approval": "ask"
+              },
+              "workspace-write": {
+                "sandbox": "workspace-write",
+                "approval": "ask"
+              },
+              "danger-full-access": {
+                "sandbox": "danger-full-access",
+                "approval": "never"
+              }
+            },
+            "defaultPreset": "danger-full-access"
+          }
+        },
+        {
+          "id": "subagent-model-selection-settings",
+          "name": "@deepseek-ai/dsh-tool-subagent/model-selection-settings",
+          "config": {
+            "enabled": true,
+            "allowedModels": [
+              {
+                "provider": "deepseek-official",
+                "model": "deepseek-flash"
+              },
+              {
+                "provider": "deepseek-account",
+                "model": "deepseek-flash"
+              }
+            ]
+          }
+        },
+        {
+          "id": "agent-default-model",
+          "name": "@deepseek-ai/dsh-agent-default-model",
+          "config": {
+            "provider": "deepseek-official",
+            "model": "deepseek-flash",
+            "reasoningEffort": "high"
+          }
+        },
+        {
+          "id": "web",
+          "name": "@deepseek-ai/dsh-web",
+          "config": {
+            "searchProvider": "deepseek-search-api",
+            "fetchProvider": "deepseek-fetch-api"
+          }
+        }
+      ]
+    }
+  },
+  "skills": [
+    "tech-resume-coach"
+  ]
+}
