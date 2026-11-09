@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "updatedAt": "2026-11-09T01:29:11.948Z",
-  "updatedBy": "DESKTOP-MM0RG6P",
+  "updatedAt": "2026-11-09T15:35:41.057Z",
+  "updatedBy": "ChenChen",
   "globalPatch": [
     {
       "insert": [
@@ -53,7 +53,9 @@
         "deepseek-harness-hello-kitty-suite": "github:Angel2518975237/deepseek-harness-hello-kitty-suite",
         "dsh-marktext": "0.1.12",
         "dsh-reading-collection": "github:zzh-github/dsh-plugin-sparknote",
-        "dsh-startup-screen": "github:6shenhonghong9/dsh-startup-screen"
+        "dsh-startup-screen": "github:6shenhonghong9/dsh-startup-screen",
+        "dsh-better-sidebar": "^0.30.1",
+        "dsh-island": "^0.6.2"
       },
       "bundles": [
         "@deepseek-ai/dsh-base",
@@ -88,7 +90,9 @@
         "@michengai/dsh-im-connect",
         "@michengai/dsh-code-review",
         "dsh-marktext",
-        "@michengai/dsh-automation"
+        "@michengai/dsh-automation",
+        "dsh-better-sidebar",
+        "dsh-island"
       ],
       "workspace": {
         "allowBuilds": {
@@ -123,7 +127,17 @@
           "@michengai/dsh-agency-agents@1.2.14",
           "@deepseek-ai/cosmokit@1.8.7-alpha.2 || 1.9.0",
           "@deepseek-ai/schemastery@3.18.6-alpha.2 || 3.19.0",
-          "dsh-marktext@0.1.12"
+          "dsh-marktext@0.1.12",
+          "@michengai/dsh-skills-manager@1.1.5 || 1.2.13 || 1.2.18 || 1.2.19 || 1.4.0",
+          "@michengai/dsh-pua@0.3.19 || 1.0.3 || 1.0.4 || 1.0.10",
+          "dshmarket@1.69.0 || 1.70.1 || 1.73.5 || 1.73.15 || 1.73.16",
+          "dsh-mobile-use@1.4.34 || 1.4.40",
+          "dsh-profile-stats@2.4.12 || 2.4.16",
+          "@michengai/dsh-archive-manager@1.0.7 || 1.1.14 || 1.3.0",
+          "@michengai/dsh-automation@0.1.52 || 1.0.18 || 1.0.22",
+          "@michengai/dsh-code-review@0.1.8 || 1.0.9",
+          "@michengai/dsh-im-connect@0.1.57 || 1.0.34",
+          "@michengai/dsh-agency-agents@1.2.14 || 1.2.27"
         ],
         "overrides": {
           "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.1",
