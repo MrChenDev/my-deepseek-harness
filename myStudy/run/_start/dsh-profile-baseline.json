@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "updatedAt": "2026-11-08T17:03:47.997Z",
-  "updatedBy": "fedora",
+  "updatedAt": "2026-11-09T01:29:11.948Z",
+  "updatedBy": "DESKTOP-MM0RG6P",
   "globalPatch": [
     {
       "insert": [
@@ -37,7 +37,23 @@
         "dsh-pet": "0.4.1",
         "dsh-profile-stats": "2.4.12",
         "dsh-whale-widget": "^0.4.2",
-        "dshmarket": "1.73.10"
+        "dshmarket": "1.73.10",
+        "@deepseek-ai/dsh-storage": "0.2.2-rc.1",
+        "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.1",
+        "@michengai/dsh-agency-agents": "1.2.25",
+        "@michengai/dsh-archive-manager": "1.2.5",
+        "@michengai/dsh-automation": "^1.0.18",
+        "@michengai/dsh-btw": "1.3.2",
+        "@michengai/dsh-code-review": "1.0.7",
+        "@michengai/dsh-codex-pet": "1.0.12",
+        "@michengai/dsh-codex-ui": "2.0.13",
+        "@michengai/dsh-im-connect": "1.0.25",
+        "@michengai/dsh-simplify": "1.0.6",
+        "@tencent-connect/dsh-qqbot": "^0.5.5",
+        "deepseek-harness-hello-kitty-suite": "github:Angel2518975237/deepseek-harness-hello-kitty-suite",
+        "dsh-marktext": "0.1.12",
+        "dsh-reading-collection": "github:zzh-github/dsh-plugin-sparknote",
+        "dsh-startup-screen": "github:6shenhonghong9/dsh-startup-screen"
       },
       "bundles": [
         "@deepseek-ai/dsh-base",
@@ -64,12 +80,23 @@
         "@deepseek-ai/dsh-experimental-forge-bundle",
         "@deepseek-ai/dsh-personalized-recommendations",
         "dsh-mobile-use",
-        "dsh-profile-stats"
+        "dsh-profile-stats",
+        "@michengai/dsh-archive-manager",
+        "@tencent-connect/dsh-qqbot",
+        "dsh-reading-collection",
+        "@michengai/dsh-agency-agents",
+        "@michengai/dsh-im-connect",
+        "@michengai/dsh-code-review",
+        "dsh-marktext",
+        "@michengai/dsh-automation"
       ],
       "workspace": {
         "allowBuilds": {
           "dshmarket": true,
-          "dshmarket@https://github.com/dsh-market/dsh-market.git": true
+          "dshmarket@https://github.com/dsh-market/dsh-market.git": true,
+          "protobufjs": false,
+          "koffi": false,
+          "dshmarket@https://codeload.github.com/zzh-github/dsh-plugin-sparknote/tar.gz/001dd7fd97591bae93aafcdd72792dc018b3a2ae": true
         },
         "minimumReleaseAgeExclude": [
           "dsh-whale-widget@0.3.2",
@@ -79,8 +106,29 @@
           "dsh-mobile-use@1.4.34",
           "dsh-profile-stats@2.4.12",
           "dshmarket@1.73.15",
-          "dsh-pet@0.4.6"
-        ]
+          "dsh-pet@0.4.6",
+          "@michengai/dsh-archive-manager@1.0.7 || 1.1.14",
+          "@michengai/dsh-automation@0.1.52 || 1.0.18",
+          "@michengai/dsh-btw@0.1.14",
+          "@michengai/dsh-code-review@0.1.8",
+          "@michengai/dsh-codex-pet@0.1.11",
+          "@michengai/dsh-codex-ui@1.1.23",
+          "@michengai/dsh-im-connect@0.1.57",
+          "@michengai/dsh-pua@0.3.19",
+          "@michengai/dsh-simplify@0.1.11",
+          "@michengai/dsh-skills-manager@1.1.5 || 1.2.19",
+          "dshmarket@1.69.0 || 1.70.1",
+          "@deepseek-ai/dsh-storage-domain@0.2.1-rc.3 || 0.2.2-alpha.3 || 0.2.2-rc.1",
+          "@deepseek-ai/dsh-storage@0.2.1-rc.3 || 0.2.2-alpha.3 || 0.2.2-rc.1",
+          "@michengai/dsh-agency-agents@1.2.14",
+          "@deepseek-ai/cosmokit@1.8.7-alpha.2 || 1.9.0",
+          "@deepseek-ai/schemastery@3.18.6-alpha.2 || 3.19.0",
+          "dsh-marktext@0.1.12"
+        ],
+        "overrides": {
+          "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.1",
+          "@deepseek-ai/dsh-storage": "0.2.2-rc.1"
+        }
       },
       "patch": [
         {
@@ -199,6 +247,123 @@
           "config": {
             "preference": "system"
           }
+        },
+        {
+          "id": "agent-loop",
+          "name": "@deepseek-ai/dsh-agent-loop",
+          "config": {
+            "agents": [],
+            "maxParallelToolCalls": 20
+          }
+        },
+        {
+          "id": "web-search-deepseek",
+          "name": "@deepseek-ai/dsh-web-search-deepseek",
+          "config": {
+            "apiKeyEnv": "DEEPSEEK_API_KEY",
+            "maxUses": 20
+          }
+        },
+        {
+          "id": "llm-pi-ai",
+          "name": "@deepseek-ai/dsh-llm-pi-ai",
+          "config": {
+            "providers": {
+              "xiaomi-token-plan-cn": {
+                "models": [
+                  {
+                    "id": "mimo-v2-pro",
+                    "name": "MiMo-V2-Pro",
+                    "contextWindow": 1048576,
+                    "maxTokens": 131072
+                  },
+                  {
+                    "id": "mimo-v2.5",
+                    "name": "MiMo-V2.5",
+                    "contextWindow": 1048576,
+                    "maxTokens": 131072
+                  },
+                  {
+                    "id": "mimo-v2.5-pro",
+                    "name": "MiMo-V2.5-Pro",
+                    "contextWindow": 1048576,
+                    "maxTokens": 131072
+                  }
+                ],
+                "apiKeyEnv": "XIAOMI_TOKEN_PLAN_CN_API_KEY"
+              }
+            }
+          }
+        },
+        {
+          "id": "im-qqbot",
+          "config": {
+            "appId": "1905834746",
+            "appSecret": "hwCTk2KdwGavGczMk8XwMmDf7a3X1W1X"
+          }
+        },
+        {
+          "id": "system-prompt",
+          "config": {
+            "personaPrefix": "You are a coding agent powered by the {{model}} model.",
+            "personaSuffix": "语言约定（最高优先级，必须严格遵守）：你的所有内部思考（reasoning / thinking / 思维链）必须使用简体中文书写，禁止使用英文思考；回复正文、计划、待办、进度说明也使用简体中文。只有代码、命令、路径、文件名、标识符、API 与库名称、错误信息原文以及必要的英文术语保留原文。用户未明确要求其它语言时，不得切换为英文。"
+          }
+        },
+        {
+          "id": "agency-agents",
+          "name": "@michengai/dsh-agency-agents",
+          "config": {
+            "enabled": [
+              "engineering-software-architect",
+              "security-appsec-engineer",
+              "testing-reality-checker",
+              "product-manager",
+              "design-ux-researcher",
+              "marketing-content-creator",
+              "marketing-growth-hacker",
+              "research-synthesist",
+              "engineering-data-engineer",
+              "support-analytics-reporter",
+              "engineering-data-visualization-engineer",
+              "product-trend-researcher",
+              "specialized-strategy-duel-agent",
+              "academic-anthropologist",
+              "academic-geographer",
+              "academic-narratologist",
+              "academic-historian",
+              "academic-psychologist",
+              "academic-statistician",
+              "academic-study-planner",
+              "chief-executive-officer",
+              "design-ux-architect",
+              "engineering-api-platform-engineer",
+              "engineering-backend-architect",
+              "engineering-embedded-firmware-engineer",
+              "engineering-embedded-linux-driver-engineer",
+              "design-ui-designer",
+              "design-visual-storyteller",
+              "engineering-ai-engineer",
+              "engineering-cms-developer",
+              "engineering-code-reviewer",
+              "engineering-frontend-developer",
+              "engineering-iot-fleet-engineer",
+              "engineering-iot-solution-architect",
+              "engineering-senior-developer",
+              "engineering-wechat-mini-program-developer"
+            ],
+            "customExperts": [],
+            "enabledTeams": [
+              "team-technical",
+              "team-product",
+              "team-content",
+              "team-data",
+              "team-research"
+            ]
+          }
+        },
+        {
+          "id": "cot-translation",
+          "disabled": true
         }
       ]
     },
@@ -211,7 +376,9 @@
         "ds-bot": "github:QingJ01/DS-Bot-App#d6b187709b9a1045f63bfb77efff7ff546e39b36&path:ds-bot",
         "dsh-pet": "0.4.1",
         "dsh-startup-screen": "github:6shenhonghong9/dsh-startup-screen",
-        "dshmarket": "1.73.11"
+        "dshmarket": "1.73.11",
+        "@michengai/dsh-codex-ui": "2.0.13",
+        "dsh-better-sidebar": "0.28.2"
       },
       "bundles": [
         "@deepseek-ai/dsh-base",
@@ -234,20 +401,26 @@
         "@michengai/dsh-pua",
         "@michengai/dsh-im-connect",
         "@michengai/dsh-automation",
-        "dshmarket"
+        "dshmarket",
+        "dsh-better-sidebar",
+        "@deepseek-ai/dsh-experimental-schedule-bundle"
       ],
       "workspace": {
         "allowBuilds": {
           "dshmarket": true,
           "dshmarket@https://github.com/dsh-market/dsh-market.git": true,
           "dshmarket@https://codeload.github.com/QingJ01/DS-Bot-App/tar.gz/d6b187709b9a1045f63bfb77efff7ff546e39b36#path:ds-bot": true,
-          "protobufjs@7.6.6": true
+          "protobufjs@7.6.6": true,
+          "dshmarket@https://codeload.github.com/6shenhonghong9/dsh-startup-screen/tar.gz/8ec3132e69f0906b3ed2f7eb083b1035cd69c1d4": true
         },
         "minimumReleaseAgeExclude": [
           "dsh-pet@0.3.1",
           "ds-bot@0.1.7",
           "dshmarket@1.73.5 || 1.73.11",
-          "@michengai/dsh-automation@1.0.18"
+          "@michengai/dsh-automation@1.0.18",
+          "dsh-better-sidebar@0.22.0",
+          "@michengai/dsh-codex-ui@1.1.21",
+          "dshmarket@1.69.0"
         ]
       },
       "patch": [
@@ -332,6 +505,13 @@
           "config": {
             "searchProvider": "deepseek-search-api",
             "fetchProvider": "deepseek-fetch-api"
+          }
+        },
+        {
+          "id": "better-sidebar",
+          "name": "dsh-better-sidebar",
+          "config": {
+            "agentOpenTools": true
           }
         }
       ]
