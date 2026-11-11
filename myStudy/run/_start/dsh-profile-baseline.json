@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "updatedAt": "2026-11-11T01:15:29.537Z",
-  "updatedBy": "ChenChen",
+  "updatedAt": "2026-11-11T01:17:13.019Z",
+  "updatedBy": "DESKTOP-MM0RG6P",
   "globalPatch": [
     {
       "insert": [
@@ -56,7 +56,8 @@
         "dsh-startup-screen": "github:6shenhonghong9/dsh-startup-screen",
         "dsh-better-sidebar": "^0.30.1",
         "dsh-island": "^0.6.2",
-        "dsh-purge-community": "https://github.com/kingcharleslzy-ai/dsh-purge/releases/latest/download/dsh-purge-community.tgz"
+        "dsh-purge-community": "https://github.com/kingcharleslzy-ai/dsh-purge/releases/latest/download/dsh-purge-community.tgz",
+        "dsh-deepread": "1.0.1"
       },
       "bundles": [
         "@deepseek-ai/dsh-base",
@@ -94,7 +95,8 @@
         "@michengai/dsh-automation",
         "dsh-better-sidebar",
         "dsh-island",
-        "dsh-purge-community"
+        "dsh-purge-community",
+        "dsh-deepread"
       ],
       "workspace": {
         "allowBuilds": {
@@ -149,7 +151,17 @@
           "@michengai/dsh-automation@0.1.52 || 1.0.18 || 1.0.22 || 0.1.52 || 1.0.18",
           "@michengai/dsh-code-review@0.1.8 || 1.0.9 || 0.1.8",
           "@michengai/dsh-im-connect@0.1.57 || 1.0.34 || 0.1.57",
-          "@michengai/dsh-agency-agents@1.2.14 || 1.2.27 || 1.2.14"
+          "@michengai/dsh-agency-agents@1.2.14 || 1.2.27 || 1.2.14",
+          "@michengai/dsh-archive-manager@1.0.7 || 1.1.14 || 1.0.7 || 1.1.14 || 1.3.0",
+          "@michengai/dsh-automation@0.1.52 || 1.0.18 || 0.1.52 || 1.0.18 || 1.0.22",
+          "@michengai/dsh-code-review@0.1.8 || 0.1.8 || 1.0.9",
+          "@michengai/dsh-im-connect@0.1.57 || 0.1.57 || 1.0.34",
+          "@michengai/dsh-pua@0.3.19 || 1.0.3 || 1.0.4 || 0.3.19 || 1.0.3 || 1.0.4 || 1.0.10",
+          "@michengai/dsh-skills-manager@1.1.5 || 1.2.19 || 1.2.13 || 1.2.18 || 1.1.5 || 1.2.13 || 1.2.18 || 1.2.19 || 1.4.0",
+          "dshmarket@1.69.0 || 1.70.1 || 1.73.5 || 1.73.15 || 1.69.0 || 1.70.1 || 1.73.5 || 1.73.15 || 1.73.16",
+          "@michengai/dsh-agency-agents@1.2.14 || 1.2.14 || 1.2.27",
+          "dsh-mobile-use@1.4.34 || 1.4.34 || 1.4.40",
+          "dsh-profile-stats@2.4.12 || 2.4.12 || 2.4.16"
         ],
         "overrides": {
           "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.1",
