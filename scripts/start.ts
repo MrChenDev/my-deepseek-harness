@@ -11,7 +11,7 @@
 
 import { execFileSync, spawn, type ChildProcess, type StdioOptions } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
@@ -293,31 +293,24 @@ function profileStorageUpdates(): { profile: string; updates: ProfileStorageUpda
   return { profile, updates }
 }
 
-/** Update existing top-level pnpm overrides without reserializing user YAML or dropping comments. */
-function updateProfileStorageOverrides(source: string, updates: readonly ProfileStorageUpdate[]): string {
-  const names = new Map(updates.map(update => [update.name, update.version]))
+/** Remove storage overrides so a linked source package is not pinned to an unpublished registry version. */
+function removeProfileStorageOverrides(source: string, names: readonly string[]): string {
+  const targets = new Set(names)
   let inOverrides = false
-  return source.split(/(?<=\n)/u).map((line) => {
+  return source.split(/(?<=\n)/u).filter((line) => {
     const content = line.replace(/\r?\n$/u, '')
     if (!inOverrides) {
       inOverrides = /^overrides:\s*(?:#.*)?$/u.test(content)
-      return line
+      return true
     }
     if (content.length > 0 && !/^[ \t]/u.test(content)) {
       inOverrides = /^overrides:\s*(?:#.*)?$/u.test(content)
-      return line
+      return true
     }
     const colon = content.indexOf(':')
-    if (colon < 0) return line
+    if (colon < 0) return true
     const key = content.slice(0, colon).trim().replace(/^['"]|['"]$/gu, '')
-    const version = names.get(key)
-    if (version === undefined) return line
-    const prefix = content.slice(0, colon + 1)
-    const rawValue = content.slice(colon + 1)
-    const match = rawValue.match(/^(\s*)(['"]?)([^'"\s]+)\2(\s*(?:#.*)?)$/u)
-    if (match === null) throw new Error(`pnpm-workspace.yaml: cannot safely update override for ${key}`)
-    const newline = line.endsWith('\r\n') ? '\r\n' : line.endsWith('\n') ? '\n' : ''
-    return `${prefix}${match[1]}${match[2]}${version}${match[2]}${match[4]}${newline}`
+    return !targets.has(key)
   }).join('')
 }
 
@@ -330,19 +323,25 @@ async function syncWebProfileStorage(): Promise<boolean> {
   const workspaceFile = join(plan.profile, 'pnpm-workspace.yaml')
   const files = [packageFile, lockFile, workspaceFile]
   const before = new Map(files.map(path => [path, existsSync(path) ? readFileSync(path) : undefined]))
-  console.log(`Web profile 存储包版本与当前源码不一致，正在同步：${plan.updates.map(item => `${item.name}@${item.version}`).join('、')}`)
+  console.log(`Web profile 存储包版本与当前源码不一致，正在改用仓库源码包：${plan.updates.map(item => `${item.name}@${item.version}`).join('、')}`)
   try {
     if (existsSync(workspaceFile)) {
       const source = readFileSync(workspaceFile, 'utf8')
-      const updated = updateProfileStorageOverrides(source, plan.updates)
+      const updated = removeProfileStorageOverrides(source, plan.updates.map(item => item.name))
       if (updated !== source) writeFileSync(workspaceFile, updated)
     }
-    const addArguments = plan.updates.map(item => `${item.name}@${item.version}`)
+    const addArguments = plan.updates.map((update) => {
+      const item = WEB_PROFILE_STORAGE_PACKAGES.find(candidate => candidate.name === update.name)
+      if (item === undefined) throw new Error(`${update.name}: storage package mapping is missing`)
+      const target = dirname(join(repositoryRoot, item.manifest)).split(sep).join('/')
+      return `${update.name}@link:${target}`
+    })
     const code = await runPnpmCommand(['dsh', 'plugin', '--profile', 'web', 'add', ...addArguments])
     if (code !== 0) throw new Error(`pnpm exited with code ${String(code)}`)
     const after = packageDependencies(packageManifest(packageFile), packageFile)
     const unresolved = plan.updates.filter((item) => {
-      if (after[item.name] !== item.version) return true
+      const spec = after[item.name]
+      if (typeof spec !== 'string' || !spec.startsWith('link:')) return true
       const installed = join(plan.profile, 'node_modules', ...item.name.split('/'), 'package.json')
       return !existsSync(installed) || packageManifest(installed).version !== item.version
     })
