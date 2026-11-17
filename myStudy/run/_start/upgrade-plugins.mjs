@@ -34,11 +34,30 @@ function installedVersion(directory, packageName) {
   return readJson(join(directory, 'node_modules', packageName, 'package.json'))?.version
 }
 
+/** Compare two semver strings, including prerelease ordering. */
+function compareSemver(a, b) {
+  const [aMain, aPre] = a.split('-')
+  const [bMain, bPre] = b.split('-')
+  const aParts = aMain.split('.').map(Number)
+  const bParts = bMain.split('.').map(Number)
+  for (let index = 0; index < 3; index += 1) {
+    const diff = (aParts[index] ?? 0) - (bParts[index] ?? 0)
+    if (diff !== 0) return diff
+  }
+  if (aPre === undefined && bPre === undefined) return 0
+  if (aPre === undefined) return 1
+  if (bPre === undefined) return -1
+  return aPre.localeCompare(bPre, undefined, { numeric: true })
+}
+
 /** 保守判断 peer 版本区间是否覆盖当前 dsh 版本（与 PowerShell 版逻辑一致）。 */
 function peerCoverage(range, version) {
   if (!range) return true
   if (range === '*' || range.startsWith('workspace:')) return true
   if (range.includes(version)) return true
+  for (const match of range.matchAll(/>=?\s*([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)/g)) {
+    if (compareSemver(version, match[1]) >= 0) return true
+  }
   const parts = version.split('.')
   if (parts.length >= 2) {
     const prefix = `${parts[0]}.${parts[1]}.`.replace(/\./g, '\\.')
