@@ -21,6 +21,7 @@ import { homedir, hostname } from 'node:os'
 import { dirname, join, resolve, relative, isAbsolute, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { applyKnownPluginFixes } from './fix-known-plugin-issues.mjs'
 
 const require = createRequire(import.meta.url)
 const yaml = require('js-yaml')
@@ -369,6 +370,10 @@ function applyBaseline(options) {
 
   if (backupDirs.length > 0) info(`\n备份已保存到：${backupDirs.join('、')}`)
   reportConflicts(conflicts)
+  if (options.applyKnownFixes !== false) {
+    info('\n检查已知插件兼容问题…')
+    applyKnownPluginFixes({ dryRun: options.dryRun === true })
+  }
   return { installTargets }
 }
 

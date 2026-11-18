@@ -199,6 +199,26 @@ node sync-dsh-profile.mjs apply    # 只应用基线
 node sync-dsh-profile.mjs diff     # 只看差异
 ```
 
+## 已知插件修复（fix-known-plugin-issues.mjs）
+
+`sync-dsh-profile` 在应用基线后会自动调用这个脚本；也可以单独运行：
+
+```bash
+node myStudy/run/_start/fix-known-plugin-issues.mjs [--dry-run]
+```
+
+覆盖的问题：
+
+| 插件 | 修复 |
+| --- | --- |
+| `@michengai/dsh-pua` 1.0.x | 新 Cordis 禁用 `ctx.root`；恢复 inject 并让 `ctx.root` 报错走降级分支 |
+| `dsh-pet` < 0.4.9 | 升级到 0.4.9（`authenticatedUrl` 已移除） |
+| `dsh-island` < 0.6.4 | 升级到 0.6.4 |
+| `@michengai/dsh-agency-agents` < 1.2.34 | 升级到 1.2.34 |
+| `dsh-reading-collection` | 当前仍不兼容，只提示，不自动移除 |
+
+`--dry-run` 只报告，不写文件、不升级。
+
 ## Linux 环境准备（Fedora / Kali / Rocky）
 
 见「首次准备」。各发行版注意：
