@@ -13,13 +13,14 @@
  * 用法：node fix-known-plugin-issues.mjs [--dry-run]
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 const PROFILES = ['web', 'desktop']
 const PROFILES_ROOT = join(homedir(), '.dsh', 'profiles')
+const latestCache = new Map()
 
 /** 比较 semver（含 prerelease）。 */
 function compareSemver(a, b) {
@@ -45,6 +46,45 @@ function readJson(path) {
 /** 读取某个 profile 里已安装包的版本。 */
 function installedVersion(profileDir, packageName) {
   return readJson(join(profileDir, 'node_modules', packageName, 'package.json'))?.version
+}
+
+/** 查询 npm 上的最新版本；失败时返回 undefined。 */
+function latestVersion(profileDir, packageName) {
+  const key = `${profileDir}|${packageName}`
+  if (latestCache.has(key)) return latestCache.get(key)
+  const result = spawnSync('pnpm', ['view', packageName, 'version'], {
+    cwd: profileDir,
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  })
+  const version = result.status === 0
+    ? (result.stdout || '').trim().split('\n').filter(Boolean).at(-1)
+    : undefined
+  latestCache.set(key, version)
+  return version
+}
+
+/** 移除 profile 里指向源码的 storage link，避免 Windows 上 pnpm 建 symlink 报 EPERM。 */
+function removeStorageLinks(profileDir, dryRun) {
+  const packageFile = join(profileDir, 'package.json')
+  const pkg = readJson(packageFile)
+  if (!pkg?.dependencies) return false
+  let changed = false
+  for (const packageName of ['@deepseek-ai/dsh-storage', '@deepseek-ai/dsh-storage-domain']) {
+    const spec = pkg.dependencies[packageName]
+    if (typeof spec !== 'string' || !spec.startsWith('link:')) continue
+    console.log(`  移除 storage link 依赖：${packageName}`)
+    delete pkg.dependencies[packageName]
+    changed = true
+    if (dryRun) continue
+    const directory = join(profileDir, 'node_modules', ...packageName.split('/'))
+    if (existsSync(directory)) {
+      if (lstatSync(directory).isSymbolicLink()) unlinkSync(directory)
+      else rmSync(directory, { recursive: true, force: true })
+    }
+  }
+  if (changed && !dryRun) writeFileSync(packageFile, `${JSON.stringify(pkg, null, 2)}\n`)
+  return changed
 }
 
 /** 对 dsh-pua 应用兼容补丁。 */
@@ -86,14 +126,25 @@ function patchDshPua(profileDir, dryRun) {
 /** 版本过低时升级单个包；升级失败只报告，不中断。 */
 function upgradeIfNeeded(profileDir, packageName, minimumVersion, dryRun) {
   const current = installedVersion(profileDir, packageName)
-  if (current === undefined || compareSemver(current, minimumVersion) >= 0) return false
-  console.log(`  ${packageName} ${current} -> ${minimumVersion}`)
+  if (current === undefined) return false
+  const latest = latestVersion(profileDir, packageName)
+  const target = latest !== undefined && compareSemver(latest, minimumVersion) >= 0 ? latest : minimumVersion
+  if (compareSemver(current, target) >= 0) return false
+  console.log(`  ${packageName} ${current} -> ${target}`)
   if (dryRun) return true
-  const result = spawnSync('pnpm', ['add', `${packageName}@${minimumVersion}`], {
+  let result = spawnSync('pnpm', ['add', `${packageName}@${target}`], {
     cwd: profileDir,
     stdio: 'inherit',
     shell: process.platform === 'win32',
   })
+  if (result.status !== 0 && target !== minimumVersion) {
+    console.log(`  ${packageName} latest 升级失败，回退到最低修复版 ${minimumVersion}`)
+    result = spawnSync('pnpm', ['add', `${packageName}@${minimumVersion}`], {
+      cwd: profileDir,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    })
+  }
   if (result.status !== 0) {
     console.warn(`  ${packageName} 升级失败，请稍后重试或手动安装。`)
     return false
@@ -116,10 +167,22 @@ export function applyKnownPluginFixes(options = {}) {
     if (!existsSync(join(profileDir, 'package.json'))) continue
     console.log(`[${name}]`)
 
+    const storageChanged = removeStorageLinks(profileDir, dryRun)
+    if (storageChanged) changed = true
+
     const puaChanges = patchDshPua(profileDir, dryRun)
     for (const change of puaChanges) {
       console.log(`  ${dryRun ? '将应用' : '已应用'}：${change}`)
       changed = true
+    }
+
+    if (storageChanged && !dryRun) {
+      const install = spawnSync('pnpm', ['install'], {
+        cwd: profileDir,
+        stdio: 'inherit',
+        shell: process.platform === 'win32',
+      })
+      if (install.status !== 0) console.warn('  pnpm install 失败，请手动检查。')
     }
 
     if (upgrade) {

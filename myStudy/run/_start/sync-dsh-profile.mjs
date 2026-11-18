@@ -277,8 +277,7 @@ function exportBaseline() {
     for (const [key, value] of Object.entries(local.dependencies)) {
       const encoded = encodeSpec(value)
       if (key in dependencies && !same(dependencies[key], encoded)) {
-        conflicts.push(`profiles/${name}/dependencies: ${key}\n    基线: ${dependencies[key]}\n    本机: ${encoded}`)
-        continue
+        info(`  更新基线依赖: ${key} ${dependencies[key]} -> ${encoded}`)
       }
       dependencies[key] = encoded
     }

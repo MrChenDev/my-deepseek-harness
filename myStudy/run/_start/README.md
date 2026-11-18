@@ -212,10 +212,12 @@ node myStudy/run/_start/fix-known-plugin-issues.mjs [--dry-run]
 | 插件 | 修复 |
 | --- | --- |
 | `@michengai/dsh-pua` 1.0.x | 新 Cordis 禁用 `ctx.root`；恢复 inject 并让 `ctx.root` 报错走降级分支 |
-| `dsh-pet` < 0.4.9 | 升级到 0.4.9（`authenticatedUrl` 已移除） |
-| `dsh-island` < 0.6.4 | 升级到 0.6.4 |
-| `@michengai/dsh-agency-agents` < 1.2.34 | 升级到 1.2.34 |
+| `dsh-pet` < 0.4.9 | 优先升到 latest，失败回退到 0.4.9（`authenticatedUrl` 已移除） |
+| `dsh-island` < 0.6.4 | 优先升到 latest，失败回退到 0.6.4 |
+| `@michengai/dsh-agency-agents` < 1.2.34 | 优先升到 latest，失败回退到 1.2.34 |
 | `dsh-reading-collection` | 当前仍不兼容，只提示，不自动移除 |
+
+脚本还会移除 profile 里指向源码的 `@deepseek-ai/dsh-storage` / `dsh-storage-domain` 的 `link:` 依赖（Windows 上 pnpm 会因 symlink 报 EPERM），让 dsh 直接使用源码包。
 
 `--dry-run` 只报告，不写文件、不升级。
 
